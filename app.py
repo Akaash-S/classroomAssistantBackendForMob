@@ -38,6 +38,7 @@ from routes.lectures import lectures_bp
 from routes.tasks import tasks_bp
 from routes.notifications import notifications_bp
 from routes.ai import ai_bp
+from routes.processing import processing_bp
 
 # Register blueprints
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
@@ -45,6 +46,7 @@ app.register_blueprint(lectures_bp, url_prefix='/api/lectures')
 app.register_blueprint(tasks_bp, url_prefix='/api/tasks')
 app.register_blueprint(notifications_bp, url_prefix='/api/notifications')
 app.register_blueprint(ai_bp, url_prefix='/api/ai')
+app.register_blueprint(processing_bp, url_prefix='/api/processing')
 
 # Database initialization function
 def init_database():
@@ -93,6 +95,15 @@ if __name__ == '__main__':
     # Initialize database on startup
     if init_database():
         logger.info("Starting Classroom Assistant Backend...")
+        
+        # Start background processor
+        try:
+            from services.background_processor import background_processor
+            background_processor.start()
+            logger.info("Background processor started")
+        except Exception as e:
+            logger.error(f"Failed to start background processor: {str(e)}")
+        
         app.run(debug=True, host='0.0.0.0', port=5000)
     else:
         logger.error("Failed to initialize database. Exiting...")
