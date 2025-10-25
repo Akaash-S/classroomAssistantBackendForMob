@@ -23,7 +23,7 @@ app.config.from_object(config[config_name])
 from database import db
 db.init_app(app)
 migrate = Migrate(app, db)
-CORS(app, origins=app.config['CORS_ORIGINS'])
+CORS(app)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
