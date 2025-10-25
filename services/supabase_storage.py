@@ -33,12 +33,34 @@ class SupabaseStorageService:
         """
         try:
             if not self.client:
-                logger.error("Supabase client not available")
+                logger.error("Supabase client not available - check SUPABASE_URL and SUPABASE_KEY environment variables")
+                return None
+            
+            # Check if credentials are set
+            if not self.supabase_url or not self.supabase_key:
+                logger.error(f"Supabase credentials missing - URL: {bool(self.supabase_url)}, KEY: {bool(self.supabase_key)}")
                 return None
             
             # Upload to the 'lectures' bucket
             bucket_name = 'lectures'
             file_path = f"audio/{file_name}"
+            
+            logger.info(f"Attempting to upload {file_name} to bucket {bucket_name}")
+            logger.info(f"File size: {len(file_content)} bytes")
+            
+            # Check if bucket exists first
+            try:
+                buckets = self.list_buckets()
+                if buckets and bucket_name not in buckets:
+                    logger.warning(f"Bucket {bucket_name} does not exist. Available buckets: {buckets}")
+                    # Try to create the bucket
+                    if self.create_bucket(bucket_name, is_public=True):
+                        logger.info(f"Created bucket {bucket_name}")
+                    else:
+                        logger.error(f"Failed to create bucket {bucket_name}")
+                        return None
+            except Exception as bucket_error:
+                logger.warning(f"Could not check buckets: {bucket_error}")
             
             response = self.client.storage.from_(bucket_name).upload(
                 path=file_path,
@@ -46,17 +68,22 @@ class SupabaseStorageService:
                 file_options={"content-type": "audio/mpeg"}
             )
             
+            logger.info(f"Upload response: {response}")
+            
             if response:
                 # Get public URL
                 public_url = self.client.storage.from_(bucket_name).get_public_url(file_path)
-                logger.info(f"Audio file uploaded successfully: {file_name}")
+                logger.info(f"Audio file uploaded successfully: {file_name} -> {public_url}")
                 return public_url
             else:
-                logger.error(f"Failed to upload audio file: {file_name}")
+                logger.error(f"Upload response was empty for file: {file_name}")
                 return None
                 
         except Exception as e:
             logger.error(f"Error uploading audio file: {str(e)}")
+            logger.error(f"Error type: {type(e).__name__}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return None
     
     def upload_image(self, file_name: str, file_content: bytes, content_type: str = "image/jpeg") -> Optional[str]:

@@ -229,22 +229,35 @@ def upload_audio(lecture_id):
         from services.supabase_storage import SupabaseStorageService
         storage_service = SupabaseStorageService()
         
+        logger.info(f"Storage service available: {storage_service.is_available()}")
+        
         if not storage_service.is_available():
+            logger.error("Storage service not available - check Supabase configuration")
             return jsonify({
                 'status': 'error',
-                'message': 'Storage service not available'
+                'message': 'Storage service not available - check Supabase configuration'
             }), 500
         
         # Read file content
         file_content = audio_file.read()
+        logger.info(f"File content size: {len(file_content)} bytes")
+        
+        if len(file_content) == 0:
+            logger.error("File content is empty")
+            return jsonify({
+                'status': 'error',
+                'message': 'File content is empty'
+            }), 400
         
         # Upload to Supabase
+        logger.info(f"Attempting to upload file: {unique_filename}")
         public_url = storage_service.upload_audio(unique_filename, file_content)
         
         if not public_url:
+            logger.error("Upload failed - no public URL returned")
             return jsonify({
                 'status': 'error',
-                'message': 'Failed to upload file to storage'
+                'message': 'Failed to upload file to storage - check backend logs for details'
             }), 500
         
         # Update lecture with audio URL
