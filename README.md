@@ -1,410 +1,215 @@
-# Classroom Assistant Backend
+# 🎓 Classroom Assistant Backend
 
-A Flask-based REST API backend for the Classroom Assistant mobile application, providing AI-powered lecture processing, task management, and user management.
+A production-ready Flask backend for the Classroom Assistant application, providing AI-powered lecture processing, user management, and task automation.
+
+## 🚀 Features
+
+- **User Authentication** - Firebase integration with role-based access
+- **Lecture Management** - Create, process, and manage lectures
+- **AI Processing** - Speech-to-text transcription and AI summarization
+- **Task Management** - Automated task generation from lectures
+- **Notification System** - Real-time notifications for users
+- **File Storage** - Supabase cloud storage for audio files
+- **RESTful API** - Complete REST API with proper error handling
 
 ## 🏗️ Architecture
 
-- **Framework**: Flask (Python)
-- **Database**: Neon PostgreSQL
-- **Storage**: Supabase Storage
-- **AI Services**: 
-  - RapidAPI (Speech-to-Text)
-  - Gemini API (Text processing, task extraction)
-- **Authentication**: Custom user management
+```
+backend/
+├── app.py                 # Main Flask application
+├── config.py             # Configuration management
+├── database.py           # Database connection
+├── models.py             # SQLAlchemy models
+├── requirements.txt      # Python dependencies
+├── Dockerfile           # Production Docker container
+├── routes/              # API route handlers
+│   ├── auth_working.py  # Authentication endpoints
+│   ├── lectures.py      # Lecture management
+│   ├── tasks.py         # Task management
+│   ├── notifications.py # Notification system
+│   └── ai.py            # AI processing endpoints
+└── services/            # External service integrations
+    ├── gemini_service.py      # Google Gemini AI
+    ├── speech_to_text.py      # RapidAPI transcription
+    └── supabase_storage.py    # Supabase cloud storage
+```
+
+## 🛠️ Technology Stack
+
+- **Framework**: Flask 2.3.3
+- **Database**: PostgreSQL with SQLAlchemy
+- **Authentication**: Firebase Auth
+- **AI Services**: Google Gemini 2.0 Flash
+- **Storage**: Supabase Cloud Storage
+- **Transcription**: RapidAPI Speech-to-Text
+- **Deployment**: Docker + Gunicorn
+- **Database Migrations**: Flask-Migrate
 
 ## 🚀 Quick Start
 
-### Prerequisites
+### Development
 
-- Python 3.8+
-- PostgreSQL database (Neon recommended)
-- Supabase account
-- RapidAPI account
-- Google AI Studio account (for Gemini API)
+```bash
+# Install dependencies
+pip install -r requirements.txt
 
-### Installation
+# Set up environment variables
+cp env.production.example .env
+# Edit .env with your configuration
 
-1. **Clone and navigate to backend directory**
-   ```bash
-   cd backend
-   ```
-
-2. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. **Set up environment variables**
-   ```bash
-   cp env_example.txt .env
-   ```
-   
-   Edit `.env` file with your credentials:
-   ```env
-   # Database Configuration
-   DATABASE_URL=postgresql://username:password@host:port/database_name
-   
-   # Supabase Configuration
-   SUPABASE_URL=your_supabase_url
-   SUPABASE_KEY=your_supabase_anon_key
-   SUPABASE_SERVICE_KEY=your_supabase_service_key
-   
-   # RapidAPI Configuration
-   RAPIDAPI_KEY=your_rapidapi_key
-   RAPIDAPI_HOST=your_rapidapi_host
-   
-   # Gemini API Configuration
-   GEMINI_API_KEY=your_gemini_api_key
-   
-   # Flask Configuration
-   FLASK_ENV=development
-   FLASK_DEBUG=True
-   SECRET_KEY=your_secret_key_here
-   
-   # CORS Configuration
-   CORS_ORIGINS=http://localhost:3000,http://localhost:8081
-   ```
-
-4. **Initialize the database**
-   ```bash
-   python init_db.py
-   ```
-
-5. **Run the application**
-   ```bash
-   python app.py
-   ```
-
-The API will be available at `http://localhost:5000`
-
-## 📚 API Documentation
-
-### Authentication Endpoints
-
-#### Register User
-```http
-POST /api/auth/register
-Content-Type: application/json
-
-{
-  "email": "user@example.com",
-  "name": "John Doe",
-  "role": "teacher", // or "student"
-  "password": "secure_password",
-  "student_id": "STU001", // for students
-  "major": "Computer Science", // for students
-  "year": "Junior", // for students
-  "department": "Computer Science", // for teachers
-  "bio": "Brief bio",
-  "phone": "+1-555-0123"
-}
+# Run the application
+python app.py
 ```
 
-#### Login User
-```http
-POST /api/auth/login
-Content-Type: application/json
+### Production with Docker
 
-{
-  "email": "user@example.com",
-  "password": "secure_password"
-}
+```bash
+# Build and run with Docker
+docker build -t classroom-assistant-backend .
+docker run -d --name classroom-backend --env-file .env -p 5000:5000 classroom-assistant-backend
+
+# Or use Docker Compose
+docker-compose up -d
 ```
 
-#### Get User Profile
-```http
-GET /api/auth/profile/{user_id}
-```
+## 📋 API Endpoints
 
-#### Update Profile
-```http
-PUT /api/auth/profile/{user_id}
-Content-Type: application/json
+### Authentication
+- `POST /api/auth/register` - User registration
+- `POST /api/auth/login` - User login
+- `GET /api/auth/user/firebase/<uid>` - Get user by Firebase UID
+- `PUT /api/auth/user/update/<uid>` - Update user profile
 
-{
-  "name": "Updated Name",
-  "bio": "Updated bio",
-  "phone": "+1-555-9999"
-}
-```
+### Lectures
+- `GET /api/lectures/` - List lectures
+- `POST /api/lectures/` - Create lecture
+- `GET /api/lectures/<id>` - Get lecture details
+- `PUT /api/lectures/<id>` - Update lecture
+- `DELETE /api/lectures/<id>` - Delete lecture
+- `POST /api/lectures/<id>/upload-audio` - Upload audio file
+- `POST /api/lectures/<id>/process` - Process with AI
 
-### Lecture Management
-
-#### Get Lectures
-```http
-GET /api/lectures?teacher_id={id}&subject={subject}&limit=20&offset=0
-```
-
-#### Create Lecture
-```http
-POST /api/lectures
-Content-Type: application/json
-
-{
-  "title": "Introduction to AI",
-  "subject": "Artificial Intelligence",
-  "teacher_id": "teacher_uuid",
-  "audio_url": "https://storage.url/audio.mp3",
-  "audio_duration": 3600
-}
-```
-
-#### Upload Audio
-```http
-POST /api/lectures/{lecture_id}/upload-audio
-Content-Type: application/json
-
-{
-  "audio_url": "https://storage.url/audio.mp3",
-  "audio_duration": 3600
-}
-```
-
-#### Process Lecture (AI)
-```http
-POST /api/lectures/{lecture_id}/process
-```
-
-### Task Management
-
-#### Get Tasks
-```http
-GET /api/tasks?user_id={id}&status=pending&priority=high&limit=20&offset=0
-```
-
-#### Create Task
-```http
-POST /api/tasks
-Content-Type: application/json
-
-{
-  "title": "Complete Assignment 1",
-  "description": "Implement linear regression algorithm",
-  "lecture_id": "lecture_uuid",
-  "assigned_to_id": "student_uuid",
-  "priority": "high",
-  "due_date": "2024-12-15T23:59:59Z"
-}
-```
-
-#### Update Task Status
-```http
-PUT /api/tasks/{task_id}/status
-Content-Type: application/json
-
-{
-  "status": "completed"
-}
-```
-
-#### Approve Task
-```http
-POST /api/tasks/{task_id}/approve
-```
-
-### AI Services
-
-#### Transcribe Audio
-```http
-POST /api/ai/transcribe
-Content-Type: application/json
-
-{
-  "audio_url": "https://storage.url/audio.mp3"
-}
-```
-
-#### Summarize Text
-```http
-POST /api/ai/summarize
-Content-Type: application/json
-
-{
-  "text": "Long text to summarize..."
-}
-```
-
-#### Extract Tasks
-```http
-POST /api/ai/extract-tasks
-Content-Type: application/json
-
-{
-  "text": "Lecture transcript with tasks mentioned..."
-}
-```
-
-#### Process Lecture (Full AI Pipeline)
-```http
-POST /api/ai/process-lecture/{lecture_id}
-```
+### Tasks
+- `GET /api/tasks/` - List tasks
+- `POST /api/tasks/` - Create task
+- `PUT /api/tasks/<id>` - Update task
+- `DELETE /api/tasks/<id>` - Delete task
 
 ### Notifications
+- `GET /api/notifications/` - List notifications
+- `POST /api/notifications/` - Create notification
+- `PUT /api/notifications/<id>/read` - Mark as read
 
-#### Get Notifications
-```http
-GET /api/notifications?user_id={id}&type=task_assigned&is_read=false&limit=20&offset=0
-```
-
-#### Create Notification
-```http
-POST /api/notifications
-Content-Type: application/json
-
-{
-  "user_id": "user_uuid",
-  "type": "task_assigned",
-  "title": "New Task Assigned",
-  "message": "You have been assigned a new task",
-  "data": {"task_id": "task_uuid"}
-}
-```
-
-#### Mark as Read
-```http
-PUT /api/notifications/{notification_id}/read
-```
-
-## 🗄️ Database Schema
-
-### Users Table
-- `id` (UUID, Primary Key)
-- `email` (String, Unique)
-- `name` (String)
-- `role` (Enum: teacher/student)
-- `student_id` (String, for students)
-- `major` (String, for students)
-- `year` (String, for students)
-- `department` (String, for teachers)
-- `bio` (Text)
-- `phone` (String)
-- `notifications_enabled` (Boolean)
-- `email_notifications` (Boolean)
-- `dark_mode` (Boolean)
-- `created_at` (DateTime)
-- `updated_at` (DateTime)
-
-### Lectures Table
-- `id` (UUID, Primary Key)
-- `title` (String)
-- `subject` (String)
-- `teacher_id` (UUID, Foreign Key)
-- `audio_url` (String)
-- `audio_duration` (Integer)
-- `transcript` (Text)
-- `summary` (Text)
-- `key_points` (JSON)
-- `tags` (JSON)
-- `is_processed` (Boolean)
-- `created_at` (DateTime)
-- `updated_at` (DateTime)
-
-### Tasks Table
-- `id` (UUID, Primary Key)
-- `title` (String)
-- `description` (Text)
-- `lecture_id` (UUID, Foreign Key)
-- `assigned_to_id` (UUID, Foreign Key)
-- `status` (Enum: pending/completed/approved)
-- `priority` (Enum: high/medium/low)
-- `due_date` (DateTime)
-- `is_ai_generated` (Boolean)
-- `created_at` (DateTime)
-- `updated_at` (DateTime)
-
-### Notifications Table
-- `id` (UUID, Primary Key)
-- `user_id` (UUID, Foreign Key)
-- `type` (Enum: task_assigned/task_due/lecture_uploaded/task_approved)
-- `title` (String)
-- `message` (Text)
-- `data` (JSON)
-- `is_read` (Boolean)
-- `created_at` (DateTime)
+### AI Processing
+- `POST /api/ai/transcribe` - Transcribe audio
+- `POST /api/ai/summarize` - Summarize text
+- `POST /api/ai/generate-tasks` - Generate tasks from lecture
 
 ## 🔧 Configuration
 
 ### Environment Variables
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `DATABASE_URL` | PostgreSQL connection string | Yes |
-| `SUPABASE_URL` | Supabase project URL | Yes |
-| `SUPABASE_KEY` | Supabase anonymous key | Yes |
-| `SUPABASE_SERVICE_KEY` | Supabase service key | Yes |
-| `RAPIDAPI_KEY` | RapidAPI key for STT | Yes |
-| `RAPIDAPI_HOST` | RapidAPI host for STT | Yes |
-| `GEMINI_API_KEY` | Google Gemini API key | Yes |
-| `SECRET_KEY` | Flask secret key | Yes |
-| `CORS_ORIGINS` | Allowed CORS origins | No |
+```env
+# Database
+DATABASE_URL=postgresql://user:pass@host:5432/db
 
-### Supabase Storage Buckets
+# Supabase
+SUPABASE_URL=https://project.supabase.co
+SUPABASE_KEY=your-anon-key
+SUPABASE_SERVICE_KEY=your-service-key
 
-Create the following buckets in your Supabase project:
+# APIs
+RAPIDAPI_KEY=your-rapidapi-key
+GEMINI_API_KEY=your-gemini-key
 
-1. **`lectures`** - For audio files
-2. **`images`** - For profile pictures and other images
+# Flask
+SECRET_KEY=your-secret-key
+CORS_ORIGINS=https://your-frontend.com
+```
 
-## 🧪 Testing
+## 🐳 Docker Deployment
 
-### Health Check
+The application is containerized for easy deployment:
+
 ```bash
+# Build image
+docker build -t classroom-assistant-backend .
+
+# Run container
+docker run -d --name classroom-backend --env-file .env -p 5000:5000 classroom-assistant-backend
+
+# Health check
 curl http://localhost:5000/api/health
 ```
 
-### Test AI Services
-```bash
-curl http://localhost:5000/api/ai/health
-```
+## 📊 Database Schema
 
-## 🚀 Deployment
+### Users
+- Firebase UID integration
+- Role-based access (teacher/student)
+- Profile management
 
-### Using Gunicorn
-```bash
-gunicorn -w 4 -b 0.0.0.0:5000 app:app
-```
+### Lectures
+- Audio file storage
+- AI-generated transcripts
+- Summaries and key points
+- Processing status
 
-### Using Docker
-```dockerfile
-FROM python:3.9-slim
+### Tasks
+- Automated generation from lectures
+- Assignment and tracking
+- Priority and status management
 
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
+### Notifications
+- Real-time user notifications
+- Email and push notifications
+- Read status tracking
 
-COPY . .
-EXPOSE 5000
+## 🔒 Security
 
-CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "app:app"]
-```
+- Firebase authentication
+- Role-based access control
+- CORS configuration
+- Environment variable security
+- Database SSL connections
+- Input validation and sanitization
 
-## 📝 Development
+## 📈 Performance
 
-### Database Migrations
-```bash
-# Initialize migrations
-flask db init
+- Database connection pooling
+- Gunicorn WSGI server
+- Request rate limiting
+- Health checks and monitoring
+- Optimized Docker layers
 
-# Create migration
-flask db migrate -m "Description"
+## 🆘 Troubleshooting
 
-# Apply migration
-flask db upgrade
-```
+### Common Issues
 
-### Running Tests
-```bash
-python -m pytest tests/
-```
+1. **Database Connection**: Check DATABASE_URL format
+2. **API Keys**: Verify all external service keys
+3. **CORS Issues**: Update CORS_ORIGINS configuration
+4. **File Upload**: Check Supabase storage configuration
 
-## 🤝 Contributing
+### Health Checks
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
+- `GET /` - Basic health check
+- `GET /api/health` - Detailed system status
 
-## 📄 License
+## 📞 Support
 
-This project is licensed under the MIT License.
+For issues and questions:
+1. Check container logs: `docker logs classroom-backend`
+2. Verify environment variables
+3. Test individual API endpoints
+4. Check external service connectivity
+
+## 🎯 Production Checklist
+
+- [ ] Environment variables configured
+- [ ] Database migrations run
+- [ ] External services tested
+- [ ] CORS origins updated
+- [ ] SSL certificates configured
+- [ ] Monitoring setup
+- [ ] Backup strategy implemented
