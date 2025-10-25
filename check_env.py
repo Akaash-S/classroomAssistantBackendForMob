@@ -22,6 +22,8 @@ def check_env_vars():
     optional_vars = [
         'SUPABASE_SERVICE_KEY',
         'GEMINI_API_KEY',
+        'RAPIDAPI_KEY',
+        'RAPIDAPI_HOST',
         'FLASK_ENV'
     ]
     

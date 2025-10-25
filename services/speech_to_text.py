@@ -2,6 +2,9 @@ import requests
 import os
 import logging
 from typing import Optional
+from dotenv import load_dotenv
+
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
@@ -30,26 +33,34 @@ class SpeechToTextService:
                 logger.error("RapidAPI key not configured")
                 return None
             
-            # Prepare headers
+            logger.info(f"Transcribing audio URL: {audio_url}")
+            
+            # Prepare headers for form-encoded data
             headers = {
                 'X-RapidAPI-Key': self.rapidapi_key,
                 'X-RapidAPI-Host': self.rapidapi_host,
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/x-www-form-urlencoded'
             }
             
-            # Prepare payload - check API documentation for correct format
-            payload = {
+            # Prepare form data
+            data = {
                 'url': audio_url,
                 'language': 'en-US'
             }
             
-            # Make API request
+            logger.info(f"Making request to: {self.base_url}/transcribe")
+            logger.info(f"Request data: {data}")
+            
+            # Make API request with form-encoded data
             response = requests.post(
                 f"{self.base_url}/transcribe",
                 headers=headers,
-                json=payload,
-                timeout=30
+                data=data,  # Use 'data' instead of 'json' for form-encoded
+                timeout=60  # Increased timeout for transcription
             )
+            
+            logger.info(f"Response status: {response.status_code}")
+            logger.info(f"Response headers: {dict(response.headers)}")
             
             if response.status_code == 200:
                 result = response.json()
