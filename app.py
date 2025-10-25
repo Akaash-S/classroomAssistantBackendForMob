@@ -1,0 +1,99 @@
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
+from dotenv import load_dotenv
+import os
+import sys
+from datetime import datetime
+import logging
+from config import config
+
+# Load environment variables
+load_dotenv()
+
+# Initialize Flask app
+app = Flask(__name__)
+
+# Configuration
+config_name = os.getenv('FLASK_ENV', 'development')
+app.config.from_object(config[config_name])
+
+# Initialize extensions
+from database import db
+db.init_app(app)
+migrate = Migrate(app, db)
+CORS(app, origins=app.config['CORS_ORIGINS'])
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Import models
+from models import User, Lecture, Task, Notification
+
+# Import routes
+from routes.auth_working import auth_bp
+from routes.lectures import lectures_bp
+from routes.tasks import tasks_bp
+from routes.notifications import notifications_bp
+from routes.ai import ai_bp
+
+# Register blueprints
+app.register_blueprint(auth_bp, url_prefix='/api/auth')
+app.register_blueprint(lectures_bp, url_prefix='/api/lectures')
+app.register_blueprint(tasks_bp, url_prefix='/api/tasks')
+app.register_blueprint(notifications_bp, url_prefix='/api/notifications')
+app.register_blueprint(ai_bp, url_prefix='/api/ai')
+
+# Database initialization function
+def init_database():
+    """Initialize the database with all tables"""
+    try:
+        with app.app_context():
+            # Create all tables
+            db.create_all()
+            logger.info("Database tables created successfully")
+            return True
+    except Exception as e:
+        logger.error(f"Error creating database tables: {str(e)}")
+        return False
+
+@app.route('/')
+def health_check():
+    return jsonify({
+        'status': 'success',
+        'message': 'Classroom Assistant API is running',
+        'timestamp': datetime.utcnow().isoformat()
+    })
+
+@app.route('/api/health')
+def api_health():
+    return jsonify({
+        'status': 'healthy',
+        'database': 'connected',
+        'timestamp': datetime.utcnow().isoformat()
+    })
+
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({
+        'status': 'error',
+        'message': 'Endpoint not found'
+    }), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    return jsonify({
+        'status': 'error',
+        'message': 'Internal server error'
+    }), 500
+
+if __name__ == '__main__':
+    # Initialize database on startup
+    if init_database():
+        logger.info("Starting Classroom Assistant Backend...")
+        app.run(debug=True, host='0.0.0.0', port=5000)
+    else:
+        logger.error("Failed to initialize database. Exiting...")
+        sys.exit(1)
