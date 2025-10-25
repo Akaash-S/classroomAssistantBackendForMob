@@ -117,7 +117,7 @@ class BackgroundProcessor:
             # Update lecture with processed data
             lecture.transcript = transcript
             lecture.summary = summary
-            lecture.key_points = key_points
+            lecture.key_points = ', '.join(key_points) if key_points else None
             lecture.is_processed = True
             lecture.updated_at = datetime.utcnow()
             
@@ -129,8 +129,9 @@ class BackgroundProcessor:
                         title=task_data.get('title', 'Extracted Task'),
                         description=task_data.get('description', ''),
                         lecture_id=lecture.id,
-                        teacher_id=lecture.teacher_id,
+                        assigned_to_id=lecture.teacher_id,  # Use assigned_to_id instead of teacher_id
                         priority=TaskPriority(task_data.get('priority', 'medium')),
+                        due_date=task_data.get('due_date'),
                         is_ai_generated=True
                     )
                     db.session.add(task)
