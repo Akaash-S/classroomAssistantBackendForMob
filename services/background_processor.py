@@ -124,18 +124,24 @@ class BackgroundProcessor:
             # Create tasks from extracted data
             created_tasks = []
             if tasks_data:
+                # Get all students for this teacher's lectures
+                from models import User
+                students = User.query.filter(User.role == 'student').all()
+                
                 for task_data in tasks_data:
-                    task = Task(
-                        title=task_data.get('title', 'Extracted Task'),
-                        description=task_data.get('description', ''),
-                        lecture_id=lecture.id,
-                        assigned_to_id=lecture.teacher_id,  # Use assigned_to_id instead of teacher_id
-                        priority=TaskPriority(task_data.get('priority', 'medium')),
-                        due_date=task_data.get('due_date'),
-                        is_ai_generated=True
-                    )
-                    db.session.add(task)
-                    created_tasks.append(task)
+                    # Create a task for each student
+                    for student in students:
+                        task = Task(
+                            title=task_data.get('title', 'Extracted Task'),
+                            description=task_data.get('description', ''),
+                            lecture_id=lecture.id,
+                            assigned_to_id=student.id,  # Assign to student
+                            priority=TaskPriority(task_data.get('priority', 'medium')),
+                            due_date=task_data.get('due_date'),
+                            is_ai_generated=True
+                        )
+                        db.session.add(task)
+                        created_tasks.append(task)
             
             db.session.commit()
             
