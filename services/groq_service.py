@@ -11,7 +11,7 @@ class GroqService:
     def __init__(self):
         self.api_key = os.getenv('GROQ_API_KEY')
         self.base_url = 'https://api.groq.com/openai/v1'
-        self.model = 'mixtral-8x7b-32768'  # Fast and capable model
+        self.model = 'llama-3.3-70b-versatile'  # Fast and capable model
         
     def is_available(self) -> bool:
         """Check if the service is available"""
