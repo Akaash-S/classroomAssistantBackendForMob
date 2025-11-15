@@ -10,6 +10,8 @@ logger = logging.getLogger(__name__)
 def get_tasks():
     try:
         user_id = request.args.get('user_id')
+        teacher_id = request.args.get('teacher_id')  # NEW: For teachers to get tasks from their lectures
+        lecture_id = request.args.get('lecture_id')  # NEW: Filter by specific lecture
         status = request.args.get('status')
         priority = request.args.get('priority')
         limit = request.args.get('limit', 20, type=int)
@@ -17,9 +19,33 @@ def get_tasks():
         
         query = Task.query
         
+        # Filter by assigned student
         if user_id:
             query = query.filter_by(assigned_to_id=user_id)
         
+        # Filter by teacher's lectures (for teacher view)
+        if teacher_id:
+            # Get all lectures by this teacher
+            teacher_lectures = Lecture.query.filter_by(teacher_id=teacher_id).all()
+            lecture_ids = [lecture.id for lecture in teacher_lectures]
+            
+            if lecture_ids:
+                query = query.filter(Task.lecture_id.in_(lecture_ids))
+            else:
+                # Teacher has no lectures, return empty
+                return jsonify({
+                    'status': 'success',
+                    'tasks': [],
+                    'total': 0,
+                    'limit': limit,
+                    'offset': offset
+                }), 200
+        
+        # Filter by specific lecture
+        if lecture_id:
+            query = query.filter_by(lecture_id=lecture_id)
+        
+        # Filter by status
         if status:
             try:
                 status_enum = TaskStatus(status)
@@ -30,6 +56,7 @@ def get_tasks():
                     'message': 'Invalid status value'
                 }), 400
         
+        # Filter by priority
         if priority:
             try:
                 priority_enum = TaskPriority(priority)
@@ -40,12 +67,16 @@ def get_tasks():
                     'message': 'Invalid priority value'
                 }), 400
         
+        # Get total count before pagination
+        total = query.count()
+        
+        # Apply pagination and ordering
         tasks = query.order_by(Task.created_at.desc()).offset(offset).limit(limit).all()
         
         return jsonify({
             'status': 'success',
             'tasks': [task.to_dict() for task in tasks],
-            'total': query.count(),
+            'total': total,
             'limit': limit,
             'offset': offset
         }), 200
