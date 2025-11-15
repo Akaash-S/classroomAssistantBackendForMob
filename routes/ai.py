@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from services.speech_to_text import SpeechToTextService
 from services.gemini_service import GeminiService
-from services.supabase_storage import SupabaseStorageService
+from services.s3_storage import S3StorageService
 from models import Lecture, Task, TaskPriority, db
 from datetime import datetime
 import logging
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 # Initialize services
 speech_to_text = SpeechToTextService()
 gemini_service = GeminiService()
-storage_service = SupabaseStorageService()
+storage_service = S3StorageService()
 
 @ai_bp.route('/transcribe', methods=['POST'])
 def transcribe_audio():

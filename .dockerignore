@@ -67,8 +67,7 @@ README.md
 *.md
 !RENDER_DEPLOYMENT_GUIDE.md
 
-# Old Supabase files (not needed with S3)
-services/supabase_storage.py
+# Old Supabase test files (not needed with S3)
 test_supabase.py
 setup_storage_policies.py
 storage_policies.sql
