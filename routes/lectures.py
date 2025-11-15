@@ -372,7 +372,6 @@ def process_lecture(lecture_id):
                                 due_date = None
                                 if task_data.get('due_date'):
                                     try:
-                                        from datetime import datetime
                                         due_date = datetime.fromisoformat(task_data['due_date'])
                                     except (ValueError, TypeError):
                                         due_date = None
