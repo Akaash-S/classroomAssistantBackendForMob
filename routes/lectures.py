@@ -303,7 +303,7 @@ def process_lecture(lecture_id):
         # Initialize AI services
         from services.speech_to_text import SpeechToTextService
         from services.gemini_service import GeminiService
-        from models import Task, TaskPriority, User
+        from models import Task, TaskPriority, User, UserRole
         
         speech_service = SpeechToTextService()
         gemini_service = GeminiService()
@@ -352,7 +352,7 @@ def process_lecture(lecture_id):
             
             if tasks_data:
                 # Get all students to assign tasks to
-                students = User.query.filter(User.role == 'student').all()
+                students = User.query.filter(User.role == UserRole.STUDENT).all()
                 
                 if students:
                     for task_data in tasks_data:
@@ -398,15 +398,19 @@ def process_lecture(lecture_id):
             else:
                 logger.info("No tasks extracted from transcript")
         else:
-            if not groq_service.is_available():
-                logger.warning("Groq service not available - tasks will not be extracted")
+            if not gemini_service.is_available():
+                logger.warning("Gemini service not available - tasks will not be extracted")
             if not transcript:
                 logger.warning("No transcript available for task extraction")
         
-        # Mark lecture as processed
+        # Mark lecture as processed and commit all changes (including tasks)
         lecture.is_processed = True
         lecture.updated_at = datetime.utcnow()
+        
+        # Commit all changes to database (lecture + tasks)
         db.session.commit()
+        
+        logger.info(f"Lecture processing completed. Tasks created: {tasks_created}")
         
         logger.info(f"Lecture processed successfully: {lecture.title}")
         

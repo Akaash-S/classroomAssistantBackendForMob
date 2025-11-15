@@ -131,8 +131,8 @@ class BackgroundProcessor:
             created_tasks = []
             if tasks_data:
                 # Get all students for this teacher's lectures
-                from models import User
-                students = User.query.filter(User.role == 'student').all()
+                from models import User, UserRole
+                students = User.query.filter(User.role == UserRole.STUDENT).all()
                 
                 for task_data in tasks_data:
                     # Create a task for each student

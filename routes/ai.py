@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from services.speech_to_text import SpeechToTextService
 from services.gemini_service import GeminiService
 from services.s3_storage import S3StorageService
-from models import Lecture, Task, TaskPriority, db, User
+from models import Lecture, Task, TaskPriority, db, User, UserRole
 from datetime import datetime
 import logging
 import os
@@ -186,7 +186,7 @@ def process_lecture(lecture_id):
         created_tasks = []
         if tasks_data:
             # Get all students to assign tasks to
-            students = User.query.filter(User.role == 'student').all()
+            students = User.query.filter(User.role == UserRole.STUDENT).all()
             
             if students:
                 for task_data in tasks_data:
