@@ -113,13 +113,26 @@ class S3StorageService:
             content_type = self._get_content_type(file_name)
             
             # Upload file to S3
-            self.s3_client.put_object(
-                Bucket=self.bucket_name,
-                Key=s3_key,
-                Body=file_content,
-                ContentType=content_type,
-                ACL='public-read'  # Make file publicly accessible
-            )
+            # Try with ACL first, fallback to without ACL if blocked
+            try:
+                self.s3_client.put_object(
+                    Bucket=self.bucket_name,
+                    Key=s3_key,
+                    Body=file_content,
+                    ContentType=content_type,
+                    ACL='public-read'  # Make file publicly accessible
+                )
+            except ClientError as acl_error:
+                if acl_error.response['Error']['Code'] == 'AccessControlListNotSupported':
+                    logger.warning("ACL not supported, uploading without ACL (bucket policy will handle access)")
+                    self.s3_client.put_object(
+                        Bucket=self.bucket_name,
+                        Key=s3_key,
+                        Body=file_content,
+                        ContentType=content_type
+                    )
+                else:
+                    raise
             
             # Generate public URL
             public_url = f"https://{self.bucket_name}.s3.{self.aws_region}.amazonaws.com/{s3_key}"
@@ -130,6 +143,7 @@ class S3StorageService:
         except ClientError as e:
             logger.error(f"AWS ClientError uploading audio file: {str(e)}")
             logger.error(f"Error code: {e.response['Error']['Code']}")
+            logger.error(f"Error message: {e.response['Error'].get('Message', 'No message')}")
             return None
         except Exception as e:
             logger.error(f"Error uploading audio file: {str(e)}")
@@ -161,13 +175,26 @@ class S3StorageService:
             logger.info(f"Uploading image {file_name} to S3")
             
             # Upload file to S3
-            self.s3_client.put_object(
-                Bucket=self.bucket_name,
-                Key=s3_key,
-                Body=file_content,
-                ContentType=content_type,
-                ACL='public-read'
-            )
+            # Try with ACL first, fallback to without ACL if blocked
+            try:
+                self.s3_client.put_object(
+                    Bucket=self.bucket_name,
+                    Key=s3_key,
+                    Body=file_content,
+                    ContentType=content_type,
+                    ACL='public-read'
+                )
+            except ClientError as acl_error:
+                if acl_error.response['Error']['Code'] == 'AccessControlListNotSupported':
+                    logger.warning("ACL not supported, uploading without ACL (bucket policy will handle access)")
+                    self.s3_client.put_object(
+                        Bucket=self.bucket_name,
+                        Key=s3_key,
+                        Body=file_content,
+                        ContentType=content_type
+                    )
+                else:
+                    raise
             
             # Generate public URL
             public_url = f"https://{self.bucket_name}.s3.{self.aws_region}.amazonaws.com/{s3_key}"
@@ -175,8 +202,15 @@ class S3StorageService:
             logger.info(f"Image file uploaded successfully: {file_name}")
             return public_url
             
+        except ClientError as e:
+            logger.error(f"AWS ClientError uploading image file: {str(e)}")
+            logger.error(f"Error code: {e.response['Error']['Code']}")
+            logger.error(f"Error message: {e.response['Error'].get('Message', 'No message')}")
+            return None
         except Exception as e:
             logger.error(f"Error uploading image file: {str(e)}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return None
     
     def delete_file(self, file_key: str) -> bool:
