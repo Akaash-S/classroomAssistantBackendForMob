@@ -303,12 +303,10 @@ def process_lecture(lecture_id):
         # Initialize AI services
         from services.speech_to_text import SpeechToTextService
         from services.gemini_service import GeminiService
-        from services.groq_service import GroqService
         from models import Task, TaskPriority, User
         
         speech_service = SpeechToTextService()
         gemini_service = GeminiService()
-        groq_service = GroqService()
         
         transcript = None
         summary = None
@@ -346,11 +344,11 @@ def process_lecture(lecture_id):
         else:
             logger.warning("Gemini service not available or no transcript")
         
-        # Step 3: Extract tasks using Groq API
-        if groq_service.is_available() and transcript:
-            logger.info(f"Extracting tasks for lecture: {lecture.title} using Groq API")
+        # Step 3: Extract tasks using Gemini API
+        if gemini_service.is_available() and transcript:
+            logger.info(f"Extracting tasks for lecture: {lecture.title} using Gemini API")
             
-            tasks_data = groq_service.extract_tasks(transcript)
+            tasks_data = gemini_service.extract_tasks(transcript)
             
             if tasks_data:
                 # Get all students to assign tasks to

@@ -7,7 +7,6 @@ from typing import List, Optional
 from models import Lecture, Task, TaskPriority, db
 from services.speech_to_text import SpeechToTextService
 from services.gemini_service import GeminiService
-from services.groq_service import GroqService
 from services.s3_storage import S3StorageService
 
 logger = logging.getLogger(__name__)
@@ -16,7 +15,6 @@ class BackgroundProcessor:
     def __init__(self):
         self.speech_to_text = SpeechToTextService()
         self.gemini_service = GeminiService()
-        self.groq_service = GroqService()
         self.storage_service = S3StorageService()
         self.is_running = False
         self.thread = None
@@ -112,18 +110,15 @@ class BackgroundProcessor:
             logger.info(f"Extracting key points for lecture: {lecture.title}")
             key_points = self.gemini_service.extract_key_points(transcript)
             
-            # Step 4: Extract tasks using Groq API (preferred) or fallback to Gemini
+            # Step 4: Extract tasks using Gemini API
             logger.info(f"Extracting tasks for lecture: {lecture.title}")
             tasks_data = []
             
-            if self.groq_service.is_available():
-                logger.info("Using Groq API for task extraction")
-                tasks_data = self.groq_service.extract_tasks(transcript)
-            elif self.gemini_service.is_available():
-                logger.info("Groq not available, falling back to Gemini for task extraction")
+            if self.gemini_service.is_available():
+                logger.info("Using Gemini API for task extraction")
                 tasks_data = self.gemini_service.extract_tasks(transcript)
             else:
-                logger.warning("No AI service available for task extraction")
+                logger.warning("Gemini service not available for task extraction")
             
             # Update lecture with processed data
             lecture.transcript = transcript
