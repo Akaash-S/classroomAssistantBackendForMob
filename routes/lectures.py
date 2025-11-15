@@ -225,17 +225,17 @@ def upload_audio(lecture_id):
         file_extension = audio_file.filename.rsplit('.', 1)[1].lower()
         unique_filename = f"{lecture_id}_{uuid.uuid4().hex}.{file_extension}"
         
-        # Upload to Supabase storage
-        from services.supabase_storage import SupabaseStorageService
-        storage_service = SupabaseStorageService()
+        # Upload to AWS S3 storage
+        from services.s3_storage import S3StorageService
+        storage_service = S3StorageService()
         
         logger.info(f"Storage service available: {storage_service.is_available()}")
         
         if not storage_service.is_available():
-            logger.error("Storage service not available - check Supabase configuration")
+            logger.error("Storage service not available - check AWS S3 configuration")
             return jsonify({
                 'status': 'error',
-                'message': 'Storage service not available - check Supabase configuration'
+                'message': 'Storage service not available - check AWS S3 configuration'
             }), 500
         
         # Read file content
@@ -249,7 +249,7 @@ def upload_audio(lecture_id):
                 'message': 'File content is empty'
             }), 400
         
-        # Upload to Supabase
+        # Upload to S3
         logger.info(f"Attempting to upload file: {unique_filename}")
         public_url = storage_service.upload_audio(unique_filename, file_content)
         

@@ -1,0 +1,49 @@
+services:
+  - type: web
+    name: classroom-assistant-backend
+    env: docker
+    dockerfilePath: ./Dockerfile
+    region: oregon
+    plan: free
+    branch: main
+    healthCheckPath: /api/health
+    envVars:
+      # Database Configuration
+      - key: DATABASE_URL
+        sync: false
+      
+      # AWS S3 Configuration (Required for file storage)
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_REGION
+        value: us-east-1
+      - key: AWS_S3_BUCKET
+        value: classroom-assistant-audio
+      
+      # RapidAPI Configuration (Required for transcription)
+      - key: RAPIDAPI_KEY
+        sync: false
+      - key: RAPIDAPI_HOST
+        value: speech-to-text-ai.p.rapidapi.com
+      - key: RAPIDAPI_ENDPOINT
+        value: /transcribe
+      - key: RAPIDAPI_LANG_VALUE
+        value: en
+      
+      # Gemini API Configuration (Required for AI features)
+      - key: GEMINI_API_KEY
+        sync: false
+      
+      # Flask Configuration
+      - key: FLASK_ENV
+        value: production
+      - key: FLASK_DEBUG
+        value: False
+      - key: SECRET_KEY
+        generateValue: true
+      
+      # CORS Configuration
+      - key: CORS_ORIGINS
+        value: http://localhost:3000,http://localhost:8081,https://your-frontend-domain.com

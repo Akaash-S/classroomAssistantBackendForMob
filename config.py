@@ -17,10 +17,11 @@ class Config:
         }
     }
     
-    # Supabase Configuration
-    SUPABASE_URL = os.getenv('SUPABASE_URL', 'your_supabase_url')
-    SUPABASE_KEY = os.getenv('SUPABASE_KEY', 'your_supabase_anon_key')
-    SUPABASE_SERVICE_KEY = os.getenv('SUPABASE_SERVICE_KEY', 'your_supabase_service_key')
+    # AWS S3 Configuration
+    AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
+    AWS_REGION = os.getenv('AWS_REGION', 'us-east-1')
+    AWS_S3_BUCKET = os.getenv('AWS_S3_BUCKET', 'classroom-assistant-audio')
     
     # RapidAPI Configuration
     RAPIDAPI_KEY = os.getenv('RAPIDAPI_KEY', 'your_rapidapi_key')
