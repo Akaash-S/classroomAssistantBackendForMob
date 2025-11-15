@@ -1,8 +1,9 @@
 from flask import Blueprint, request, jsonify
 from services.speech_to_text import SpeechToTextService
 from services.gemini_service import GeminiService
+from services.groq_service import GroqService
 from services.s3_storage import S3StorageService
-from models import Lecture, Task, TaskPriority, db
+from models import Lecture, Task, TaskPriority, db, User
 from datetime import datetime
 import logging
 import os
@@ -13,6 +14,7 @@ logger = logging.getLogger(__name__)
 # Initialize services
 speech_to_text = SpeechToTextService()
 gemini_service = GeminiService()
+groq_service = GroqService()
 storage_service = S3StorageService()
 
 @ai_bp.route('/transcribe', methods=['POST'])
@@ -94,14 +96,23 @@ def extract_tasks():
                 'message': 'Text is required'
             }), 400
         
-        # Extract tasks using Gemini
-        tasks = gemini_service.extract_tasks(data['text'])
+        # Extract tasks using Groq API (preferred) or fallback to Gemini
+        tasks = []
         
-        if not tasks:
+        if groq_service.is_available():
+            logger.info("Using Groq API for task extraction")
+            tasks = groq_service.extract_tasks(data['text'])
+        elif gemini_service.is_available():
+            logger.info("Groq not available, falling back to Gemini for task extraction")
+            tasks = gemini_service.extract_tasks(data['text'])
+        else:
             return jsonify({
                 'status': 'error',
-                'message': 'Failed to extract tasks'
-            }), 500
+                'message': 'No AI service available for task extraction'
+            }), 503
+        
+        if tasks is None:
+            tasks = []
         
         logger.info(f"Extracted {len(tasks)} tasks from text")
         
@@ -158,34 +169,75 @@ def process_lecture(lecture_id):
         logger.info(f"Extracting key points for lecture: {lecture.title}")
         key_points = gemini_service.extract_key_points(transcript)
         
-        # Step 4: Extract tasks
+        # Step 4: Extract tasks using Groq API (preferred) or fallback to Gemini
         logger.info(f"Extracting tasks for lecture: {lecture.title}")
-        tasks_data = gemini_service.extract_tasks(transcript)
+        tasks_data = []
+        
+        if groq_service.is_available():
+            logger.info("Using Groq API for task extraction")
+            tasks_data = groq_service.extract_tasks(transcript)
+        elif gemini_service.is_available():
+            logger.info("Groq not available, falling back to Gemini for task extraction")
+            tasks_data = gemini_service.extract_tasks(transcript)
+        else:
+            logger.warning("No AI service available for task extraction")
         
         # Update lecture with processed data
         lecture.transcript = transcript
         lecture.summary = summary
-        lecture.key_points = key_points
+        if key_points:
+            lecture.key_points = ', '.join(key_points) if isinstance(key_points, list) else key_points
         lecture.is_processed = True
         lecture.updated_at = datetime.utcnow()
         
         # Create tasks from extracted data
         created_tasks = []
         if tasks_data:
-            for task_data in tasks_data:
-                task = Task(
-                    title=task_data.get('title', 'Extracted Task'),
-                    description=task_data.get('description', ''),
-                    lecture_id=lecture.id,
-                    priority=TaskPriority(task_data.get('priority', 'medium')),
-                    is_ai_generated=True
-                )
-                db.session.add(task)
-                created_tasks.append(task)
+            # Get all students to assign tasks to
+            students = User.query.filter(User.role == 'student').all()
+            
+            if students:
+                for task_data in tasks_data:
+                    for student in students:
+                        try:
+                            # Parse priority
+                            priority_str = task_data.get('priority', 'medium').lower()
+                            if priority_str == 'high':
+                                priority = TaskPriority.HIGH
+                            elif priority_str == 'low':
+                                priority = TaskPriority.LOW
+                            else:
+                                priority = TaskPriority.MEDIUM
+                            
+                            # Parse due date
+                            due_date = None
+                            if task_data.get('due_date'):
+                                try:
+                                    from datetime import datetime as dt
+                                    due_date = dt.fromisoformat(task_data['due_date'])
+                                except (ValueError, TypeError):
+                                    due_date = None
+                            
+                            task = Task(
+                                title=task_data.get('title', 'Extracted Task'),
+                                description=task_data.get('description', ''),
+                                lecture_id=lecture.id,
+                                assigned_to_id=student.id,
+                                priority=priority,
+                                due_date=due_date,
+                                is_ai_generated=True
+                            )
+                            db.session.add(task)
+                            created_tasks.append(task)
+                        except Exception as task_error:
+                            logger.error(f"Error creating task: {str(task_error)}")
+                            continue
+            else:
+                logger.warning("No students found to assign tasks to")
         
         db.session.commit()
         
-        logger.info(f"Lecture processing completed: {lecture.title}")
+        logger.info(f"Lecture processing completed: {lecture.title}, created {len(created_tasks)} tasks")
         
         return jsonify({
             'status': 'success',
@@ -249,14 +301,19 @@ def ai_health_check():
         services_status = {
             'speech_to_text': speech_to_text.is_available(),
             'gemini': gemini_service.is_available(),
+            'groq': groq_service.is_available(),
             'storage': storage_service.is_available()
         }
+        
+        # At least one AI service should be available for task extraction
+        task_extraction_available = services_status['groq'] or services_status['gemini']
         
         all_healthy = all(services_status.values())
         
         return jsonify({
             'status': 'success' if all_healthy else 'partial',
             'services': services_status,
+            'task_extraction_available': task_extraction_available,
             'timestamp': datetime.utcnow().isoformat()
         }), 200 if all_healthy else 503
         

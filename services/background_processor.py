@@ -7,6 +7,7 @@ from typing import List, Optional
 from models import Lecture, Task, TaskPriority, db
 from services.speech_to_text import SpeechToTextService
 from services.gemini_service import GeminiService
+from services.groq_service import GroqService
 from services.s3_storage import S3StorageService
 
 logger = logging.getLogger(__name__)
@@ -15,6 +16,7 @@ class BackgroundProcessor:
     def __init__(self):
         self.speech_to_text = SpeechToTextService()
         self.gemini_service = GeminiService()
+        self.groq_service = GroqService()
         self.storage_service = S3StorageService()
         self.is_running = False
         self.thread = None
@@ -110,9 +112,18 @@ class BackgroundProcessor:
             logger.info(f"Extracting key points for lecture: {lecture.title}")
             key_points = self.gemini_service.extract_key_points(transcript)
             
-            # Step 4: Extract tasks
+            # Step 4: Extract tasks using Groq API (preferred) or fallback to Gemini
             logger.info(f"Extracting tasks for lecture: {lecture.title}")
-            tasks_data = self.gemini_service.extract_tasks(transcript)
+            tasks_data = []
+            
+            if self.groq_service.is_available():
+                logger.info("Using Groq API for task extraction")
+                tasks_data = self.groq_service.extract_tasks(transcript)
+            elif self.gemini_service.is_available():
+                logger.info("Groq not available, falling back to Gemini for task extraction")
+                tasks_data = self.gemini_service.extract_tasks(transcript)
+            else:
+                logger.warning("No AI service available for task extraction")
             
             # Update lecture with processed data
             lecture.transcript = transcript
@@ -131,17 +142,38 @@ class BackgroundProcessor:
                 for task_data in tasks_data:
                     # Create a task for each student
                     for student in students:
-                        task = Task(
-                            title=task_data.get('title', 'Extracted Task'),
-                            description=task_data.get('description', ''),
-                            lecture_id=lecture.id,
-                            assigned_to_id=student.id,  # Assign to student
-                            priority=TaskPriority(task_data.get('priority', 'medium')),
-                            due_date=task_data.get('due_date'),
-                            is_ai_generated=True
-                        )
-                        db.session.add(task)
-                        created_tasks.append(task)
+                        try:
+                            # Parse priority
+                            priority_str = task_data.get('priority', 'medium').lower()
+                            if priority_str == 'high':
+                                priority = TaskPriority.HIGH
+                            elif priority_str == 'low':
+                                priority = TaskPriority.LOW
+                            else:
+                                priority = TaskPriority.MEDIUM
+                            
+                            # Parse due date
+                            due_date = None
+                            if task_data.get('due_date'):
+                                try:
+                                    due_date = datetime.fromisoformat(task_data['due_date'])
+                                except (ValueError, TypeError):
+                                    due_date = None
+                            
+                            task = Task(
+                                title=task_data.get('title', 'Extracted Task'),
+                                description=task_data.get('description', ''),
+                                lecture_id=lecture.id,
+                                assigned_to_id=student.id,  # Assign to student
+                                priority=priority,
+                                due_date=due_date,
+                                is_ai_generated=True
+                            )
+                            db.session.add(task)
+                            created_tasks.append(task)
+                        except Exception as task_error:
+                            logger.error(f"Error creating task: {str(task_error)}")
+                            continue
             
             db.session.commit()
             

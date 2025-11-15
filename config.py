@@ -31,6 +31,9 @@ class Config:
     GEMINI_MODEL_NAME = 'gemini-2.0-flash'
     GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models'
     
+    # Groq API Configuration (for task extraction)
+    GROQ_API_KEY = os.getenv('GROQ_API_KEY', 'your_groq_api_key')
+    
     # CORS Configuration
     CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://localhost:3000,http://localhost:8081').split(',')
 

@@ -303,13 +303,17 @@ def process_lecture(lecture_id):
         # Initialize AI services
         from services.speech_to_text import SpeechToTextService
         from services.gemini_service import GeminiService
+        from services.groq_service import GroqService
+        from models import Task, TaskPriority, User
         
         speech_service = SpeechToTextService()
         gemini_service = GeminiService()
+        groq_service = GroqService()
         
         transcript = None
         summary = None
         key_points = None
+        tasks_created = 0
         
         # Step 1: Transcribe audio
         if speech_service.is_available():
@@ -324,7 +328,7 @@ def process_lecture(lecture_id):
         else:
             logger.warning("Speech-to-text service not available")
         
-        # Step 2: Generate summary and key points
+        # Step 2: Generate summary and key points using Gemini
         if gemini_service.is_available() and transcript:
             logger.info(f"Generating summary for lecture: {lecture.title}")
             
@@ -335,13 +339,72 @@ def process_lecture(lecture_id):
                 logger.info(f"Summary generated: {len(summary)} characters")
             
             # Generate key points
-            key_points_prompt = f"Extract the key points from this lecture transcript:\n\n{transcript}\n\nProvide 5-7 main points in bullet format."
-            key_points = gemini_service.generate_summary(key_points_prompt)
-            if key_points:
-                lecture.key_points = key_points
-                logger.info(f"Key points generated: {len(key_points)} characters")
+            key_points_list = gemini_service.extract_key_points(transcript)
+            if key_points_list:
+                lecture.key_points = ', '.join(key_points_list)
+                logger.info(f"Key points generated: {len(key_points_list)} points")
         else:
             logger.warning("Gemini service not available or no transcript")
+        
+        # Step 3: Extract tasks using Groq API
+        if groq_service.is_available() and transcript:
+            logger.info(f"Extracting tasks for lecture: {lecture.title} using Groq API")
+            
+            tasks_data = groq_service.extract_tasks(transcript)
+            
+            if tasks_data:
+                # Get all students to assign tasks to
+                students = User.query.filter(User.role == 'student').all()
+                
+                if students:
+                    for task_data in tasks_data:
+                        # Create task for each student
+                        for student in students:
+                            try:
+                                # Parse priority
+                                priority_str = task_data.get('priority', 'medium').lower()
+                                if priority_str == 'high':
+                                    priority = TaskPriority.HIGH
+                                elif priority_str == 'low':
+                                    priority = TaskPriority.LOW
+                                else:
+                                    priority = TaskPriority.MEDIUM
+                                
+                                # Parse due date
+                                due_date = None
+                                if task_data.get('due_date'):
+                                    try:
+                                        from datetime import datetime
+                                        due_date = datetime.fromisoformat(task_data['due_date'])
+                                    except (ValueError, TypeError):
+                                        due_date = None
+                                
+                                # Create task
+                                task = Task(
+                                    title=task_data.get('title', 'Extracted Task'),
+                                    description=task_data.get('description', ''),
+                                    lecture_id=lecture.id,
+                                    assigned_to_id=student.id,
+                                    priority=priority,
+                                    due_date=due_date,
+                                    is_ai_generated=True
+                                )
+                                db.session.add(task)
+                                tasks_created += 1
+                            except Exception as task_error:
+                                logger.error(f"Error creating task: {str(task_error)}")
+                                continue
+                    
+                    logger.info(f"Created {tasks_created} tasks from {len(tasks_data)} extracted tasks")
+                else:
+                    logger.warning("No students found to assign tasks to")
+            else:
+                logger.info("No tasks extracted from transcript")
+        else:
+            if not groq_service.is_available():
+                logger.warning("Groq service not available - tasks will not be extracted")
+            if not transcript:
+                logger.warning("No transcript available for task extraction")
         
         # Mark lecture as processed
         lecture.is_processed = True
@@ -357,7 +420,8 @@ def process_lecture(lecture_id):
             'processing_results': {
                 'transcript_generated': bool(transcript),
                 'summary_generated': bool(summary),
-                'key_points_generated': bool(key_points)
+                'key_points_generated': bool(key_points),
+                'tasks_created': tasks_created
             }
         }), 200
         
