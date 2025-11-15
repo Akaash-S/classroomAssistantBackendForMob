@@ -11,6 +11,7 @@ class TaskStatus(Enum):
     PENDING = "pending"
     COMPLETED = "completed"
     APPROVED = "approved"
+    REJECTED = "rejected"
 
 class TaskPriority(Enum):
     HIGH = "high"
