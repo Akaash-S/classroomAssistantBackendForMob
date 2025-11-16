@@ -197,6 +197,40 @@ def get_user_by_firebase_uid(firebase_uid):
             'message': 'Failed to get user'
         }), 500
 
+@auth_bp.route('/users', methods=['GET'])
+def get_users():
+    """Get all users, optionally filtered by role"""
+    try:
+        role_filter = request.args.get('role')
+        
+        query = User.query
+        
+        # Filter by role if provided
+        if role_filter:
+            try:
+                role = UserRole(role_filter)
+                query = query.filter_by(role=role)
+            except ValueError:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Invalid role. Must be "teacher" or "student"'
+                }), 400
+        
+        users = query.order_by(User.name).all()
+        
+        return jsonify({
+            'status': 'success',
+            'users': [user.to_dict() for user in users],
+            'total': len(users)
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Get users error: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': 'Failed to get users'
+        }), 500
+
 @auth_bp.route('/user/update/<firebase_uid>', methods=['PUT'])
 def update_user_profile(firebase_uid):
     try:
@@ -208,6 +242,9 @@ def update_user_profile(firebase_uid):
                 'status': 'error',
                 'message': 'User not found'
             }), 404
+        
+        # Get database from current app context
+        db = current_app.extensions['sqlalchemy']
         
         # Update user fields
         if 'name' in data:
