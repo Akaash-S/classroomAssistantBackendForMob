@@ -8,8 +8,8 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     FLASK_ENV=production \
-    FLASK_DEBUG=False \
-    PORT=5000
+    FLASK_DEBUG=0 \
+    PORT=10000
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -18,6 +18,7 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     curl \
     ca-certificates \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
@@ -25,22 +26,25 @@ COPY requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir gunicorn
 
 # Copy application code
 COPY . .
 
-# Create non-root user for security
-RUN adduser --disabled-password --gecos '' appuser && \
-    chown -R appuser:appuser /app
-USER appuser
+# Create uploads directory with proper permissions
+RUN mkdir -p /app/uploads && \
+    chmod 755 /app/uploads
 
-# Expose port
-EXPOSE 5000
+# Make startup script executable
+RUN chmod +x start.sh
+
+# Expose port (Render uses PORT environment variable)
+EXPOSE ${PORT}
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:${PORT:-5000}/api/health || exit 1
+HEALTHCHECK --interval=30s --timeout=30s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:${PORT:-10000}/api/health || exit 1
 
-# Run the application with dynamic port binding for Render
-CMD gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 4 --timeout 120 --keep-alive 2 --max-requests 1000 --max-requests-jitter 100 --access-logfile - --error-logfile - app:app
+# Run the application with startup script
+CMD ["./start.sh"]

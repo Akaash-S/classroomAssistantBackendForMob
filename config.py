@@ -7,14 +7,18 @@ load_dotenv()
 class Config:
     """Base configuration class"""
     SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
-    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL', 'sqlite:///classroom_assistant.db')
+    
+    # Database configuration with Render compatibility
+    database_url = os.getenv('DATABASE_URL', 'sqlite:///classroom_assistant.db')
+    # Render uses postgres:// but SQLAlchemy needs postgresql://
+    if database_url and database_url.startswith('postgres://'):
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    SQLALCHEMY_DATABASE_URI = database_url
+    
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_pre_ping': True,
         'pool_recycle': 300,
-        'connect_args': {
-            'sslmode': 'require'
-        }
     }
     
     # AWS S3 Configuration
@@ -48,18 +52,21 @@ class ProductionConfig(Config):
     FLASK_ENV = 'production'
     
     # Production-specific database settings
+    database_url = os.getenv('DATABASE_URL', 'sqlite:///classroom_assistant.db')
+    if database_url and database_url.startswith('postgres://'):
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    SQLALCHEMY_DATABASE_URI = database_url
+    
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_pre_ping': True,
         'pool_recycle': 300,
-        'pool_size': 20,
-        'max_overflow': 30,
-        'connect_args': {
-            'sslmode': 'require'
-        }
+        'pool_size': 5,
+        'max_overflow': 10,
     }
     
-    # Production CORS settings
-    CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'https://your-production-domain.com').split(',')
+    # Production CORS settings - allow all for now
+    cors_origins = os.getenv('CORS_ORIGINS', '*')
+    CORS_ORIGINS = cors_origins if cors_origins == '*' else cors_origins.split(',')
 
 # Configuration dictionary
 config = {

@@ -65,19 +65,32 @@ def init_database():
 
 @app.route('/')
 def health_check():
+    """Root endpoint for Render health checks"""
     return jsonify({
         'status': 'success',
         'message': 'Classroom Assistant API is running',
+        'version': '1.0.0',
         'timestamp': datetime.utcnow().isoformat()
-    })
+    }), 200
 
 @app.route('/api/health')
 def api_health():
+    """Detailed health check endpoint"""
+    try:
+        # Test database connection
+        db.session.execute('SELECT 1')
+        db_status = 'connected'
+    except Exception as e:
+        logger.error(f"Database health check failed: {str(e)}")
+        db_status = 'disconnected'
+    
     return jsonify({
         'status': 'healthy',
-        'database': 'connected',
+        'database': db_status,
+        'port': os.getenv('PORT', '5000'),
+        'environment': os.getenv('FLASK_ENV', 'development'),
         'timestamp': datetime.utcnow().isoformat()
-    })
+    }), 200
 
 @app.errorhandler(404)
 def not_found(error):
@@ -93,20 +106,24 @@ def internal_error(error):
         'message': 'Internal server error'
     }), 500
 
+# Initialize database on import (for Gunicorn)
+try:
+    with app.app_context():
+        db.create_all()
+        logger.info("Database tables initialized")
+except Exception as e:
+    logger.error(f"Database initialization error: {str(e)}")
+
+# Start background processor (for Gunicorn)
+try:
+    from services.background_processor import background_processor
+    background_processor.start()
+    logger.info("Background processor started")
+except Exception as e:
+    logger.warning(f"Background processor not started: {str(e)}")
+
 if __name__ == '__main__':
-    # Initialize database on startup
-    if init_database():
-        logger.info("Starting Classroom Assistant Backend...")
-        
-        # Start background processor
-        try:
-            from services.background_processor import background_processor
-            background_processor.start()
-            logger.info("Background processor started")
-        except Exception as e:
-            logger.error(f"Failed to start background processor: {str(e)}")
-        
-        app.run(debug=True, host='0.0.0.0', port=5000)
-    else:
-        logger.error("Failed to initialize database. Exiting...")
-        sys.exit(1)
+    # Development server
+    port = int(os.getenv('PORT', 5000))
+    logger.info(f"Starting Classroom Assistant Backend on port {port}...")
+    app.run(debug=False, host='0.0.0.0', port=port)
