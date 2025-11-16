@@ -38,6 +38,7 @@ class User(db.Model):
     department = db.Column(db.String(100), nullable=True)  # For teachers
     bio = db.Column(db.Text, nullable=True)
     phone = db.Column(db.String(20), nullable=True)
+    avatar_url = db.Column(db.String(500), nullable=True)  # AWS S3 URL for profile picture
     notifications_enabled = db.Column(db.Boolean, default=True)
     email_notifications = db.Column(db.Boolean, default=True)
     dark_mode = db.Column(db.Boolean, default=False)
@@ -62,6 +63,7 @@ class User(db.Model):
             'department': self.department,
             'bio': self.bio,
             'phone': self.phone,
+            'avatar_url': self.avatar_url,
             'notifications_enabled': self.notifications_enabled,
             'email_notifications': self.email_notifications,
             'dark_mode': self.dark_mode,

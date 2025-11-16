@@ -261,6 +261,8 @@ def update_user_profile(firebase_uid):
             user.bio = data['bio']
         if 'phone' in data:
             user.phone = data['phone']
+        if 'avatar_url' in data:
+            user.avatar_url = data['avatar_url']
         if 'notifications_enabled' in data:
             user.notifications_enabled = data['notifications_enabled']
         if 'email_notifications' in data:
@@ -288,4 +290,111 @@ def update_user_profile(firebase_uid):
         return jsonify({
             'status': 'error',
             'message': 'Failed to update profile'
+        }), 500
+
+@auth_bp.route('/user/<user_id>/upload-avatar', methods=['POST'])
+def upload_avatar(user_id):
+    """Upload user avatar to AWS S3"""
+    try:
+        from services.s3_storage import S3StorageService
+        import uuid
+        
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({
+                'status': 'error',
+                'message': 'User not found'
+            }), 404
+        
+        # Check if file is present
+        if 'avatar' not in request.files:
+            return jsonify({
+                'status': 'error',
+                'message': 'No avatar file provided'
+            }), 400
+        
+        avatar_file = request.files['avatar']
+        
+        if avatar_file.filename == '':
+            return jsonify({
+                'status': 'error',
+                'message': 'No file selected'
+            }), 400
+        
+        # Validate file type
+        allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+        file_ext = avatar_file.filename.rsplit('.', 1)[1].lower() if '.' in avatar_file.filename else ''
+        
+        if file_ext not in allowed_extensions:
+            return jsonify({
+                'status': 'error',
+                'message': f'Invalid file type. Allowed: {", ".join(allowed_extensions)}'
+            }), 400
+        
+        # Upload to S3
+        s3_service = S3StorageService()
+        
+        # Generate unique filename
+        filename = f"profile/{user.id}_{uuid.uuid4().hex}.{file_ext}"
+        
+        # Read file content
+        file_content = avatar_file.read()
+        
+        # Determine content type
+        content_type_map = {
+            'png': 'image/png',
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'gif': 'image/gif',
+            'webp': 'image/webp'
+        }
+        content_type = content_type_map.get(file_ext, 'image/jpeg')
+        
+        # Upload using upload_image method
+        avatar_url = s3_service.upload_image(filename, file_content, content_type)
+        
+        if not avatar_url:
+            return jsonify({
+                'status': 'error',
+                'message': 'Failed to upload avatar to S3'
+            }), 500
+        
+        # Delete old avatar if exists
+        if user.avatar_url:
+            try:
+                # Extract the key from the old URL
+                old_key = user.avatar_url.split('.com/')[-1]
+                s3_service.delete_file(old_key)
+            except Exception as e:
+                logger.warning(f"Failed to delete old avatar: {str(e)}")
+        
+        # Update user avatar URL
+        user.avatar_url = avatar_url
+        user.updated_at = datetime.utcnow()
+        
+        # Get database from current app context
+        db = current_app.extensions['sqlalchemy']
+        db.session.commit()
+        
+        logger.info(f"Avatar uploaded for user: {user.email}")
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Avatar uploaded successfully',
+            'avatar_url': avatar_url,
+            'user': user.to_dict()
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Upload avatar error: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        try:
+            db = current_app.extensions['sqlalchemy']
+            db.session.rollback()
+        except:
+            pass
+        return jsonify({
+            'status': 'error',
+            'message': f'Failed to upload avatar: {str(e)}'
         }), 500
