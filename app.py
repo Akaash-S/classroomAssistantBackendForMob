@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
+from sqlalchemy import text
 from dotenv import load_dotenv
 import os
 import sys
@@ -77,8 +78,8 @@ def health_check():
 def api_health():
     """Detailed health check endpoint"""
     try:
-        # Test database connection
-        db.session.execute('SELECT 1')
+        # Test database connection using SQLAlchemy 2.0 syntax
+        db.session.execute(text('SELECT 1'))
         db_status = 'connected'
     except Exception as e:
         logger.error(f"Database health check failed: {str(e)}")
