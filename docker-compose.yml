@@ -1,0 +1,102 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: classroom-db
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME:-classroom_assistant}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - classroom-network
+
+  # Flask Backend Application
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: classroom-backend
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      # Database
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD}@db:5432/${DB_NAME:-classroom_assistant}
+      
+      # Flask
+      FLASK_ENV: production
+      FLASK_DEBUG: 0
+      SECRET_KEY: ${SECRET_KEY}
+      PORT: 5000
+      
+      # Firebase
+      FIREBASE_CREDENTIALS: ${FIREBASE_CREDENTIALS}
+      
+      # Google Cloud (for Speech-to-Text)
+      GOOGLE_APPLICATION_CREDENTIALS: /app/google-credentials.json
+      GOOGLE_CLOUD_PROJECT: ${GOOGLE_CLOUD_PROJECT}
+      
+      # Groq API
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      
+      # Google Gemini API
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      
+      # File Upload
+      UPLOAD_FOLDER: /app/uploads
+      MAX_CONTENT_LENGTH: 104857600
+      
+      # CORS (optional)
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      
+    volumes:
+      - ./uploads:/app/uploads
+      - ./google-credentials.json:/app/google-credentials.json:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - classroom-network
+
+  # Nginx Reverse Proxy (Optional but recommended for production)
+  nginx:
+    image: nginx:alpine
+    container_name: classroom-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - ./uploads:/app/uploads:ro
+    depends_on:
+      - backend
+    networks:
+      - classroom-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  classroom-network:
+    driver: bridge

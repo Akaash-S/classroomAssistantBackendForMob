@@ -162,3 +162,68 @@ class Notification(db.Model):
             'is_read': self.is_read,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
+
+
+class ChatRoom(db.Model):
+    __tablename__ = 'chat_rooms'
+    
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    teacher_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
+    student_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
+    last_message = db.Column(db.Text, nullable=True)
+    last_message_at = db.Column(db.DateTime, nullable=True)
+    unread_count_teacher = db.Column(db.Integer, default=0)
+    unread_count_student = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    teacher = db.relationship('User', foreign_keys=[teacher_id], backref='teacher_chats')
+    student = db.relationship('User', foreign_keys=[student_id], backref='student_chats')
+    messages = db.relationship('ChatMessage', backref='chat_room', lazy=True, cascade='all, delete-orphan')
+    
+    def to_dict(self, current_user_id=None):
+        # Determine the other user
+        other_user = self.student if current_user_id == self.teacher_id else self.teacher
+        unread_count = self.unread_count_teacher if current_user_id == self.teacher_id else self.unread_count_student
+        
+        return {
+            'id': self.id,
+            'teacher_id': self.teacher_id,
+            'student_id': self.student_id,
+            'teacher_name': self.teacher.name,
+            'student_name': self.student.name,
+            'other_user_id': other_user.id,
+            'other_user_name': other_user.name,
+            'other_user_role': other_user.role.value,
+            'last_message': self.last_message,
+            'last_message_at': self.last_message_at.isoformat() if self.last_message_at else None,
+            'unread_count': unread_count,
+            'created_at': self.created_at.isoformat(),
+            'updated_at': self.updated_at.isoformat()
+        }
+
+class ChatMessage(db.Model):
+    __tablename__ = 'chat_messages'
+    
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    chat_room_id = db.Column(db.String(36), db.ForeignKey('chat_rooms.id'), nullable=False)
+    sender_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    is_read = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    sender = db.relationship('User', foreign_keys=[sender_id])
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'chat_room_id': self.chat_room_id,
+            'sender_id': self.sender_id,
+            'sender_name': self.sender.name,
+            'sender_role': self.sender.role.value,
+            'message': self.message,
+            'is_read': self.is_read,
+            'created_at': self.created_at.isoformat()
+        }

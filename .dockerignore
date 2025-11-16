@@ -4,6 +4,9 @@ __pycache__/
 *$py.class
 *.so
 .Python
+env/
+venv/
+ENV/
 build/
 develop-eggs/
 dist/
@@ -22,14 +25,15 @@ wheels/
 
 # Virtual environments
 venv/
-env/
 ENV/
+env/
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
 
 # OS
 .DS_Store
@@ -44,35 +48,35 @@ Dockerfile
 docker-compose.yml
 .dockerignore
 
-# Environment files
+# Environment
 .env
 .env.local
-.env.production
+.env.*.local
 
 # Logs
 *.log
 logs/
 
-# Test files
-test_*.py
-*_test.py
-tests/
-
-# Setup scripts (not needed in production)
-setup_*.py
-quick_start_*.py
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
 
 # Documentation
-README.md
 *.md
-!RENDER_DEPLOYMENT_GUIDE.md
+docs/
 
-# Old Supabase test files (not needed with S3)
-test_supabase.py
-setup_storage_policies.py
-storage_policies.sql
-SUPABASE_*.md
+# Uploads (will be mounted as volume)
+uploads/*
 
-# Temporary files
-*.tmp
-*.temp
+# SSL certificates
+ssl/
+*.pem
+*.key
+*.crt
+
+# Backup files
+*.bak
+*.backup
+*.sql

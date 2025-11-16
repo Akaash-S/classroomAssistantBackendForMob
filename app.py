@@ -39,6 +39,7 @@ from routes.tasks import tasks_bp
 from routes.notifications import notifications_bp
 from routes.ai import ai_bp
 from routes.processing import processing_bp
+from routes.chat import chat_bp
 
 # Register blueprints
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
@@ -47,6 +48,7 @@ app.register_blueprint(tasks_bp, url_prefix='/api/tasks')
 app.register_blueprint(notifications_bp, url_prefix='/api/notifications')
 app.register_blueprint(ai_bp, url_prefix='/api/ai')
 app.register_blueprint(processing_bp, url_prefix='/api/processing')
+app.register_blueprint(chat_bp, url_prefix='/api/chat')
 
 # Database initialization function
 def init_database():
