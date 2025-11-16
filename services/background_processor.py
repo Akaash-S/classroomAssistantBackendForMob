@@ -12,16 +12,24 @@ from services.s3_storage import S3StorageService
 logger = logging.getLogger(__name__)
 
 class BackgroundProcessor:
-    def __init__(self):
+    def __init__(self, app=None):
         self.speech_to_text = SpeechToTextService()
         self.gemini_service = GeminiService()
         self.storage_service = S3StorageService()
         self.is_running = False
         self.thread = None
         self.processing_interval = 300  # 5 minutes
+        self.app = app
         
-    def start(self):
+    def start(self, app=None):
         """Start the background processing thread"""
+        if app:
+            self.app = app
+            
+        if not self.app:
+            logger.warning("No Flask app provided, background processor cannot start")
+            return
+            
         if self.is_running:
             logger.warning("Background processor is already running")
             return
@@ -42,7 +50,11 @@ class BackgroundProcessor:
         """Main processing loop"""
         while self.is_running:
             try:
-                self._process_unprocessed_lectures()
+                if self.app:
+                    with self.app.app_context():
+                        self._process_unprocessed_lectures()
+                else:
+                    logger.warning("No Flask app context available")
                 time.sleep(self.processing_interval)
             except Exception as e:
                 logger.error(f"Error in background processing loop: {str(e)}")
@@ -183,23 +195,27 @@ class BackgroundProcessor:
     def process_lecture_immediately(self, lecture_id: str) -> dict:
         """Process a specific lecture immediately"""
         try:
-            lecture = Lecture.query.get(lecture_id)
-            if not lecture:
-                return {'success': False, 'message': 'Lecture not found'}
+            if not self.app:
+                return {'success': False, 'message': 'No Flask app context available'}
                 
-            if lecture.is_processed:
-                return {'success': True, 'message': 'Lecture already processed'}
+            with self.app.app_context():
+                lecture = Lecture.query.get(lecture_id)
+                if not lecture:
+                    return {'success': False, 'message': 'Lecture not found'}
+                    
+                if lecture.is_processed:
+                    return {'success': True, 'message': 'Lecture already processed'}
+                    
+                if not lecture.audio_url:
+                    return {'success': False, 'message': 'No audio file found'}
+                    
+                self._process_lecture(lecture)
                 
-            if not lecture.audio_url:
-                return {'success': False, 'message': 'No audio file found'}
-                
-            self._process_lecture(lecture)
-            
-            return {
-                'success': True, 
-                'message': 'Lecture processed successfully',
-                'lecture_id': lecture_id
-            }
+                return {
+                    'success': True, 
+                    'message': 'Lecture processed successfully',
+                    'lecture_id': lecture_id
+                }
             
         except Exception as e:
             logger.error(f"Error processing lecture immediately: {str(e)}")
@@ -208,20 +224,24 @@ class BackgroundProcessor:
     def get_processing_status(self) -> dict:
         """Get the current processing status"""
         try:
-            total_lectures = Lecture.query.count()
-            processed_lectures = Lecture.query.filter(Lecture.is_processed == True).count()
-            unprocessed_lectures = Lecture.query.filter(
-                Lecture.audio_url.isnot(None),
-                Lecture.is_processed == False
-            ).count()
-            
-            return {
-                'is_running': self.is_running,
-                'total_lectures': total_lectures,
-                'processed_lectures': processed_lectures,
-                'unprocessed_lectures': unprocessed_lectures,
-                'processing_interval': self.processing_interval
-            }
+            if not self.app:
+                return {'error': 'No Flask app context available'}
+                
+            with self.app.app_context():
+                total_lectures = Lecture.query.count()
+                processed_lectures = Lecture.query.filter(Lecture.is_processed == True).count()
+                unprocessed_lectures = Lecture.query.filter(
+                    Lecture.audio_url.isnot(None),
+                    Lecture.is_processed == False
+                ).count()
+                
+                return {
+                    'is_running': self.is_running,
+                    'total_lectures': total_lectures,
+                    'processed_lectures': processed_lectures,
+                    'unprocessed_lectures': unprocessed_lectures,
+                    'processing_interval': self.processing_interval
+                }
             
         except Exception as e:
             logger.error(f"Error getting processing status: {str(e)}")

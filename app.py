@@ -118,7 +118,7 @@ except Exception as e:
 # Start background processor (for Gunicorn)
 try:
     from services.background_processor import background_processor
-    background_processor.start()
+    background_processor.start(app)
     logger.info("Background processor started")
 except Exception as e:
     logger.warning(f"Background processor not started: {str(e)}")
