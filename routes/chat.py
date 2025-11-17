@@ -464,3 +464,128 @@ def get_unread_count():
             'status': 'error',
             'message': 'Failed to get unread count'
         }), 500
+
+@chat_bp.route('/rooms/<room_id>/upload-document', methods=['POST'])
+def upload_document(room_id):
+    """Upload a document to a chat room"""
+    try:
+        from services.s3_storage import S3StorageService
+        from werkzeug.utils import secure_filename
+        
+        # Get sender_id from form data
+        sender_id = request.form.get('sender_id')
+        
+        if not sender_id:
+            return jsonify({
+                'status': 'error',
+                'message': 'sender_id is required'
+            }), 400
+        
+        # Check if file is present
+        if 'document' not in request.files:
+            return jsonify({
+                'status': 'error',
+                'message': 'No file uploaded'
+            }), 400
+        
+        file = request.files['document']
+        
+        if file.filename == '':
+            return jsonify({
+                'status': 'error',
+                'message': 'No file selected'
+            }), 400
+        
+        # Verify chat room exists
+        chat_room = ChatRoom.query.get(room_id)
+        
+        if not chat_room:
+            return jsonify({
+                'status': 'error',
+                'message': 'Chat room not found'
+            }), 404
+        
+        # Verify sender is part of this chat room
+        if sender_id not in [chat_room.teacher_id, chat_room.student_id]:
+            return jsonify({
+                'status': 'error',
+                'message': 'Unauthorized to upload document in this chat room'
+            }), 403
+        
+        # Get file info
+        filename = secure_filename(file.filename)
+        file_content = file.read()
+        file_size = len(file_content)
+        content_type = file.content_type or 'application/octet-stream'
+        
+        # Check file size (10MB limit)
+        max_size = 10 * 1024 * 1024  # 10MB
+        if file_size > max_size:
+            return jsonify({
+                'status': 'error',
+                'message': 'File too large. Maximum size is 10MB'
+            }), 400
+        
+        logger.info(f"Uploading document: {filename} ({file_size} bytes) to room {room_id}")
+        
+        # Upload to S3
+        s3_service = S3StorageService()
+        document_url = s3_service.upload_document(
+            file_name=filename,
+            file_content=file_content,
+            room_id=room_id,
+            content_type=content_type
+        )
+        
+        if not document_url:
+            return jsonify({
+                'status': 'error',
+                'message': 'Failed to upload document to storage'
+            }), 500
+        
+        logger.info(f"Document uploaded to S3: {document_url}")
+        
+        # Create chat message with document
+        message_text = f"Shared a document: {filename}"
+        
+        message = ChatMessage(
+            chat_room_id=room_id,
+            sender_id=sender_id,
+            message=message_text,
+            document_url=document_url,
+            document_name=filename,
+            document_size=file_size,
+            document_type=content_type
+        )
+        
+        # Update chat room
+        chat_room.last_message = message_text[:100]
+        chat_room.last_message_at = datetime.utcnow()
+        
+        # Increment unread count for the other user
+        if sender_id == chat_room.teacher_id:
+            chat_room.unread_count_student += 1
+        else:
+            chat_room.unread_count_teacher += 1
+        
+        db.session.add(message)
+        db.session.commit()
+        
+        logger.info(f"Document message created in chat room {room_id}")
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Document uploaded successfully',
+            'document_url': document_url,
+            'chat_message': message.to_dict()
+        }), 201
+        
+    except Exception as e:
+        logger.error(f"Upload document error: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        db.session.rollback()
+        return jsonify({
+            'status': 'error',
+            'message': 'Failed to upload document'
+        }), 500

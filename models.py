@@ -198,6 +198,7 @@ class ChatRoom(db.Model):
             'other_user_id': other_user.id,
             'other_user_name': other_user.name,
             'other_user_role': other_user.role.value,
+            'avatar_url': other_user.avatar_url,
             'last_message': self.last_message,
             'last_message_at': self.last_message_at.isoformat() if self.last_message_at else None,
             'unread_count': unread_count,
@@ -212,6 +213,10 @@ class ChatMessage(db.Model):
     chat_room_id = db.Column(db.String(36), db.ForeignKey('chat_rooms.id'), nullable=False)
     sender_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
     message = db.Column(db.Text, nullable=False)
+    document_url = db.Column(db.String(500), nullable=True)  # S3 URL for document
+    document_name = db.Column(db.String(255), nullable=True)  # Original filename
+    document_size = db.Column(db.Integer, nullable=True)  # File size in bytes
+    document_type = db.Column(db.String(100), nullable=True)  # MIME type
     is_read = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
@@ -225,7 +230,12 @@ class ChatMessage(db.Model):
             'sender_id': self.sender_id,
             'sender_name': self.sender.name,
             'sender_role': self.sender.role.value,
+            'avatar_url': self.sender.avatar_url,
             'message': self.message,
+            'document_url': self.document_url,
+            'document_name': self.document_name,
+            'document_size': self.document_size,
+            'document_type': self.document_type,
             'is_read': self.is_read,
             'created_at': self.created_at.isoformat()
         }

@@ -403,6 +403,77 @@ class S3StorageService:
             logger.error(f"Traceback: {traceback.format_exc()}")
             return False
     
+    def upload_document(self, file_name: str, file_content: bytes, room_id: str, content_type: str = None) -> Optional[str]:
+        """
+        Upload document file to S3
+        
+        Args:
+            file_name: Name of the file to upload
+            file_content: Binary content of the file
+            room_id: Chat room ID for organizing documents
+            content_type: MIME type of the file (optional, will be detected if not provided)
+            
+        Returns:
+            Public URL of the uploaded file or None if failed
+        """
+        try:
+            if not self.s3_client:
+                logger.error("S3 client not available - check AWS credentials")
+                return None
+            
+            # Generate unique filename to avoid conflicts
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            unique_filename = f"{timestamp}_{file_name}"
+            
+            # Define the S3 key (path in bucket)
+            s3_key = f"documents/{room_id}/{unique_filename}"
+            
+            logger.info(f"Uploading document {file_name} to S3 bucket {self.bucket_name}")
+            logger.info(f"File size: {len(file_content)} bytes")
+            
+            # Determine content type
+            if not content_type:
+                content_type = self._get_content_type(file_name)
+            
+            # Upload file to S3
+            try:
+                self.s3_client.put_object(
+                    Bucket=self.bucket_name,
+                    Key=s3_key,
+                    Body=file_content,
+                    ContentType=content_type,
+                    ACL='public-read'  # Make file publicly accessible
+                )
+            except ClientError as acl_error:
+                if acl_error.response['Error']['Code'] == 'AccessControlListNotSupported':
+                    logger.warning("ACL not supported, uploading without ACL (bucket policy will handle access)")
+                    self.s3_client.put_object(
+                        Bucket=self.bucket_name,
+                        Key=s3_key,
+                        Body=file_content,
+                        ContentType=content_type
+                    )
+                else:
+                    raise
+            
+            # Generate public URL
+            public_url = f"https://{self.bucket_name}.s3.{self.aws_region}.amazonaws.com/{s3_key}"
+            
+            logger.info(f"Document uploaded successfully: {file_name} -> {public_url}")
+            return public_url
+            
+        except ClientError as e:
+            logger.error(f"AWS ClientError uploading document: {str(e)}")
+            logger.error(f"Error code: {e.response['Error']['Code']}")
+            logger.error(f"Error message: {e.response['Error'].get('Message', 'No message')}")
+            return None
+        except Exception as e:
+            logger.error(f"Error uploading document: {str(e)}")
+            logger.error(f"Error type: {type(e).__name__}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return None
+    
     def _get_content_type(self, file_name: str) -> str:
         """
         Determine content type based on file extension
@@ -416,13 +487,34 @@ class S3StorageService:
         extension = file_name.rsplit('.', 1)[-1].lower() if '.' in file_name else ''
         
         content_types = {
+            # Audio
             'mp3': 'audio/mpeg',
             'wav': 'audio/wav',
             'm4a': 'audio/mp4',
             'flac': 'audio/flac',
             'ogg': 'audio/ogg',
             'aac': 'audio/aac',
-            'webm': 'audio/webm'
+            'webm': 'audio/webm',
+            # Documents
+            'pdf': 'application/pdf',
+            'doc': 'application/msword',
+            'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'xls': 'application/vnd.ms-excel',
+            'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'ppt': 'application/vnd.ms-powerpoint',
+            'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'txt': 'text/plain',
+            # Images
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'png': 'image/png',
+            'gif': 'image/gif',
+            'bmp': 'image/bmp',
+            'svg': 'image/svg+xml',
+            # Archives
+            'zip': 'application/zip',
+            'rar': 'application/x-rar-compressed',
+            '7z': 'application/x-7z-compressed'
         }
         
         return content_types.get(extension, 'application/octet-stream')
