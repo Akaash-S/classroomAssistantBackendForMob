@@ -18,19 +18,59 @@ def get_chat_rooms():
                 'message': 'user_id is required'
             }), 400
         
-        # Get chat rooms where user is either teacher or student
-        chat_rooms = ChatRoom.query.filter(
-            (ChatRoom.teacher_id == user_id) | (ChatRoom.student_id == user_id)
-        ).order_by(ChatRoom.last_message_at.desc().nullslast()).all()
+        # Get chat rooms with user info using JOIN to avoid recursion
+        from sqlalchemy import or_
+        from sqlalchemy.orm import aliased
+        
+        TeacherUser = aliased(User)
+        StudentUser = aliased(User)
+        
+        query = db.session.query(
+            ChatRoom,
+            TeacherUser,
+            StudentUser
+        ).join(
+            TeacherUser, ChatRoom.teacher_id == TeacherUser.id
+        ).join(
+            StudentUser, ChatRoom.student_id == StudentUser.id
+        ).filter(
+            or_(ChatRoom.teacher_id == user_id, ChatRoom.student_id == user_id)
+        ).order_by(ChatRoom.last_message_at.desc().nullslast())
+        
+        rooms_data = []
+        for room, teacher, student in query.all():
+            # Determine the other user
+            other_user = student if user_id == room.teacher_id else teacher
+            unread_count = room.unread_count_teacher if user_id == room.teacher_id else room.unread_count_student
+            
+            room_dict = {
+                'id': room.id,
+                'teacher_id': room.teacher_id,
+                'student_id': room.student_id,
+                'teacher_name': teacher.name,
+                'student_name': student.name,
+                'other_user_id': other_user.id,
+                'other_user_name': other_user.name,
+                'other_user_role': other_user.role.value,
+                'avatar_url': other_user.avatar_url,
+                'last_message': room.last_message,
+                'last_message_at': room.last_message_at.isoformat() if room.last_message_at else None,
+                'unread_count': unread_count,
+                'created_at': room.created_at.isoformat(),
+                'updated_at': room.updated_at.isoformat()
+            }
+            rooms_data.append(room_dict)
         
         return jsonify({
             'status': 'success',
-            'chat_rooms': [room.to_dict(current_user_id=user_id) for room in chat_rooms],
-            'total': len(chat_rooms)
+            'chat_rooms': rooms_data,
+            'total': len(rooms_data)
         }), 200
         
     except Exception as e:
         logger.error(f"Get chat rooms error: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({
             'status': 'error',
             'message': 'Failed to get chat rooms'
@@ -84,7 +124,14 @@ def create_chat_room():
             return jsonify({
                 'status': 'success',
                 'message': 'Chat room already exists',
-                'chat_room': existing_room.to_dict()
+                'chat_room': {
+                    'id': existing_room.id,
+                    'teacher_id': existing_room.teacher_id,
+                    'student_id': existing_room.student_id,
+                    'teacher_name': teacher.name,
+                    'student_name': student.name,
+                    'created_at': existing_room.created_at.isoformat()
+                }
             }), 200
         
         # Create new chat room
@@ -101,7 +148,14 @@ def create_chat_room():
         return jsonify({
             'status': 'success',
             'message': 'Chat room created successfully',
-            'chat_room': chat_room.to_dict()
+            'chat_room': {
+                'id': chat_room.id,
+                'teacher_id': chat_room.teacher_id,
+                'student_id': chat_room.student_id,
+                'teacher_name': teacher.name,
+                'student_name': student.name,
+                'created_at': chat_room.created_at.isoformat()
+            }
         }), 201
         
     except Exception as e:
@@ -118,28 +172,53 @@ def get_chat_room(room_id):
     try:
         user_id = request.args.get('user_id')
         
-        chat_room = ChatRoom.query.get(room_id)
+        # Get chat room with user info using JOIN to avoid recursion
+        from sqlalchemy import and_, or_
+        from sqlalchemy.orm import aliased
         
-        if not chat_room:
+        TeacherUser = aliased(User)
+        StudentUser = aliased(User)
+        
+        query = db.session.query(
+            ChatRoom,
+            TeacherUser,
+            StudentUser
+        ).join(
+            TeacherUser, ChatRoom.teacher_id == TeacherUser.id
+        ).join(
+            StudentUser, ChatRoom.student_id == StudentUser.id
+        ).filter(
+            and_(
+                ChatRoom.id == room_id,
+                or_(ChatRoom.teacher_id == user_id, ChatRoom.student_id == user_id) if user_id else True
+            )
+        ).first()
+        
+        if not query:
             return jsonify({
                 'status': 'error',
-                'message': 'Chat room not found'
+                'message': 'Chat room not found or access denied'
             }), 404
         
-        # Verify user is part of this chat room
-        if user_id and user_id not in [chat_room.teacher_id, chat_room.student_id]:
-            return jsonify({
-                'status': 'error',
-                'message': 'Unauthorized access to chat room'
-            }), 403
+        chat_room, teacher, student = query
+        
+        # Get other user info
+        other_user = student if user_id == chat_room.teacher_id else teacher
         
         return jsonify({
             'status': 'success',
-            'chat_room': chat_room.to_dict(current_user_id=user_id)
+            'chat_room': {
+                'id': chat_room.id,
+                'other_user_name': other_user.name,
+                'other_user_role': other_user.role.value,
+                'avatar_url': other_user.avatar_url
+            }
         }), 200
         
     except Exception as e:
         logger.error(f"Get chat room error: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({
             'status': 'error',
             'message': 'Failed to get chat room'
@@ -169,14 +248,45 @@ def get_messages(room_id):
                 'message': 'Unauthorized access to chat room'
             }), 403
         
-        # Get messages
-        messages = ChatMessage.query.filter_by(
-            chat_room_id=room_id
-        ).order_by(ChatMessage.created_at.desc()).offset(offset).limit(limit).all()
+        # Get messages with sender info using JOIN to avoid recursion
+        query = db.session.query(ChatMessage, User).join(
+            User, ChatMessage.sender_id == User.id
+        ).filter(
+            ChatMessage.chat_room_id == room_id
+        ).order_by(
+            ChatMessage.created_at.desc()
+        ).offset(offset).limit(limit)
+        
+        messages_data = []
+        message_objects = []
+        
+        for message, sender in query.all():
+            message_dict = {
+                'id': message.id,
+                'chat_room_id': message.chat_room_id,
+                'sender_id': message.sender_id,
+                'sender_name': sender.name,
+                'sender_role': sender.role.value,
+                'avatar_url': sender.avatar_url,
+                'message': message.message,
+                'document_url': message.document_url,
+                'document_name': message.document_name,
+                'document_size': message.document_size,
+                'document_type': message.document_type,
+                'is_read': message.is_read,
+                'created_at': message.created_at.isoformat()
+            }
+            messages_data.append(message_dict)
+            message_objects.append(message)
         
         # Mark messages as read if user_id is provided
         if user_id:
-            unread_messages = [msg for msg in messages if msg.sender_id != user_id and not msg.is_read]
+            unread_messages = ChatMessage.query.filter(
+                ChatMessage.chat_room_id == room_id,
+                ChatMessage.sender_id != user_id,
+                ChatMessage.is_read == False
+            ).all()
+            
             for msg in unread_messages:
                 msg.is_read = True
             
@@ -190,11 +300,11 @@ def get_messages(room_id):
                 db.session.commit()
         
         # Reverse to show oldest first
-        messages.reverse()
+        messages_data.reverse()
         
         return jsonify({
             'status': 'success',
-            'messages': [msg.to_dict() for msg in messages],
+            'messages': messages_data,
             'total': ChatMessage.query.filter_by(chat_room_id=room_id).count(),
             'limit': limit,
             'offset': offset
@@ -202,6 +312,8 @@ def get_messages(room_id):
         
     except Exception as e:
         logger.error(f"Get messages error: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({
             'status': 'error',
             'message': 'Failed to get messages'
@@ -267,10 +379,27 @@ def send_message(room_id):
         
         logger.info(f"Message sent in chat room {room_id} by user {sender_id}")
         
+        # Get sender info for response
+        sender = User.query.get(sender_id)
+        
         return jsonify({
             'status': 'success',
             'message': 'Message sent successfully',
-            'chat_message': message.to_dict()
+            'chat_message': {
+                'id': message.id,
+                'chat_room_id': message.chat_room_id,
+                'sender_id': message.sender_id,
+                'sender_name': sender.name,
+                'sender_role': sender.role.value,
+                'avatar_url': sender.avatar_url,
+                'message': message.message,
+                'document_url': message.document_url,
+                'document_name': message.document_name,
+                'document_size': message.document_size,
+                'document_type': message.document_type,
+                'is_read': message.is_read,
+                'created_at': message.created_at.isoformat()
+            }
         }), 201
         
     except Exception as e:
@@ -573,11 +702,28 @@ def upload_document(room_id):
         
         logger.info(f"Document message created in chat room {room_id}")
         
+        # Get sender info for response
+        sender = User.query.get(sender_id)
+        
         return jsonify({
             'status': 'success',
             'message': 'Document uploaded successfully',
             'document_url': document_url,
-            'chat_message': message.to_dict()
+            'chat_message': {
+                'id': message.id,
+                'chat_room_id': message.chat_room_id,
+                'sender_id': message.sender_id,
+                'sender_name': sender.name,
+                'sender_role': sender.role.value,
+                'avatar_url': sender.avatar_url,
+                'message': message.message,
+                'document_url': message.document_url,
+                'document_name': message.document_name,
+                'document_size': message.document_size,
+                'document_type': message.document_type,
+                'is_read': message.is_read,
+                'created_at': message.created_at.isoformat()
+            }
         }), 201
         
     except Exception as e:

@@ -180,9 +180,9 @@ class ChatRoom(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
-    teacher = db.relationship('User', foreign_keys=[teacher_id], backref='teacher_chats')
-    student = db.relationship('User', foreign_keys=[student_id], backref='student_chats')
-    messages = db.relationship('ChatMessage', backref='chat_room', lazy=True, cascade='all, delete-orphan')
+    teacher = db.relationship('User', foreign_keys=[teacher_id], backref=db.backref('teacher_chats', lazy='dynamic'))
+    student = db.relationship('User', foreign_keys=[student_id], backref=db.backref('student_chats', lazy='dynamic'))
+    messages = db.relationship('ChatMessage', backref=db.backref('chat_room', lazy='joined'), lazy='dynamic', cascade='all, delete-orphan')
     
     def to_dict(self, current_user_id=None):
         # Determine the other user
@@ -221,7 +221,7 @@ class ChatMessage(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relationships
-    sender = db.relationship('User', foreign_keys=[sender_id])
+    sender = db.relationship('User', foreign_keys=[sender_id], backref=db.backref('sent_messages', lazy='dynamic'))
     
     def to_dict(self):
         return {
