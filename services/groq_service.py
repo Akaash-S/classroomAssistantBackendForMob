@@ -4,7 +4,9 @@ import json
 import requests
 from typing import Optional, List, Dict
 from datetime import datetime, timedelta
+from dotenv import load_dotenv
 
+load_dotenv()
 logger = logging.getLogger(__name__)
 
 class GroqService:
