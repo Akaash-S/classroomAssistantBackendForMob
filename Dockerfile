@@ -11,6 +11,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     FLASK_DEBUG=0 \
     PORT=10000
 
+# AWS credentials will be passed via environment variables
+# No need to copy credential files into the container
+
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     gcc \

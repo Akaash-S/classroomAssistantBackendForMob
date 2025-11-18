@@ -1,91 +1,48 @@
-# 🚨 QUICK FIX: Recording Upload Error
+# Quick Fix: "Failed to Save Lecture" Error
 
-## **Problem**
-```
-ERROR Failed to save lecture: [Error: Failed to upload file to storage]
-```
+## The Problem
+Getting "Failed to save lecture" when uploading audio files in Docker.
 
-## **Root Cause**
-The backend is missing required environment variables, specifically Supabase credentials for file storage.
+## The Solution
+Your `docker-compose.yml` was missing AWS S3 credentials. This has been fixed.
 
-## **Immediate Solution**
+## Apply the Fix NOW
 
-### Option 1: Quick Setup (Recommended)
-```bash
-# Navigate to backend directory
+### Windows (PowerShell)
+```powershell
 cd backend
-
-# Run the interactive setup script
-python setup_env.py
+docker-compose down
+docker-compose up -d
 ```
 
-This script will guide you through setting up all required environment variables.
-
-### Option 2: Manual Setup
+### Linux/Mac
 ```bash
-# Copy the environment template
-cp env.example .env
-
-# Edit the .env file with your Supabase credentials
-# (Use your preferred editor)
+cd backend
+docker-compose down
+docker-compose up -d
 ```
 
-### Option 3: Set Environment Variables Directly
-```bash
-# Set environment variables (Windows PowerShell)
-$env:SUPABASE_URL="https://your-project-id.supabase.co"
-$env:SUPABASE_KEY="your-supabase-anon-key"
-$env:SUPABASE_SERVICE_KEY="your-supabase-service-key"
-$env:SECRET_KEY="your-secret-key"
-$env:DATABASE_URL="sqlite:///instance/classroom_assistant.db"
-
-# Start the backend
-python app.py
-```
-
-## **Required Supabase Setup**
-
-1. **Create Supabase Project**:
-   - Go to [supabase.com](https://supabase.com)
-   - Create a new project
-   - Wait for setup to complete
-
-2. **Get Credentials**:
-   - Go to Settings → API
-   - Copy Project URL and API keys
-
-3. **Create Storage Bucket**:
-   - Go to Storage → New Bucket
-   - Name: `lectures`
-   - Make it **public** ✅
-
-## **Test the Fix**
-
-After setting up environment variables:
+## Verify It Works
 
 ```bash
-# Test environment
-python check_env.py
+# Check if AWS variables are loaded
+docker-compose exec backend env | grep AWS
 
-# Test Supabase connection
-python test_supabase.py
-
-# Start backend
-python app.py
+# Test S3 connection
+docker-compose exec backend python test_s3_endpoint.py
 ```
 
-## **Expected Results**
+## What Was Changed
 
-✅ Environment check should show all variables as "OK"  
-✅ Supabase test should show "All tests passed"  
-✅ Recording should upload successfully to Supabase storage  
-✅ Lecture should appear in the database with audio_url populated  
+✅ Added AWS S3 environment variables to docker-compose.yml
+✅ Added RapidAPI environment variables for speech-to-text
+✅ Removed unused Google Cloud dependencies
 
-## **Still Having Issues?**
+## That's It!
 
-1. **Check backend logs** for detailed error messages
-2. **Verify Supabase project** is active and accessible
-3. **Ensure `lectures` bucket** exists and is public
-4. **Test with the provided scripts** to isolate the issue
+Your lecture uploads should now work. The container can now access S3 storage.
 
-The recording functionality will work once the environment variables are properly configured!
+---
+
+**Need more details?** See `DOCKER_FIX_SUMMARY.md`
+**Deployment guide?** See `DOCKER_S3_DEPLOYMENT.md`

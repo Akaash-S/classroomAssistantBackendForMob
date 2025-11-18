@@ -43,12 +43,17 @@ services:
       SECRET_KEY: ${SECRET_KEY}
       PORT: 5000
       
-      # Firebase
-      FIREBASE_CREDENTIALS: ${FIREBASE_CREDENTIALS}
+      # AWS S3 Storage
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET}
       
-      # Google Cloud (for Speech-to-Text)
-      GOOGLE_APPLICATION_CREDENTIALS: /app/google-credentials.json
-      GOOGLE_CLOUD_PROJECT: ${GOOGLE_CLOUD_PROJECT}
+      # RapidAPI (Speech-to-Text)
+      RAPIDAPI_KEY: ${RAPIDAPI_KEY}
+      RAPIDAPI_HOST: ${RAPIDAPI_HOST}
+      RAPIDAPI_ENDPOINT: ${RAPIDAPI_ENDPOINT}
+      RAPIDAPI_LANG_VALUE: ${RAPIDAPI_LANG_VALUE}
       
       # Groq API
       GROQ_API_KEY: ${GROQ_API_KEY}
@@ -65,7 +70,6 @@ services:
       
     volumes:
       - ./uploads:/app/uploads
-      - ./google-credentials.json:/app/google-credentials.json:ro
     # depends_on removed - using external Neon database
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
