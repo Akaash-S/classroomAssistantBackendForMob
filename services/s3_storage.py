@@ -4,14 +4,16 @@ from typing import Optional
 import boto3
 from botocore.exceptions import ClientError, NoCredentialsError
 from datetime import datetime
+from dotenv import load_dotenv
 
+load_dotenv()
 logger = logging.getLogger(__name__)
 
 class S3StorageService:
     def __init__(self, auto_create_bucket: bool = True):
         self.aws_access_key = os.getenv('AWS_ACCESS_KEY_ID')
         self.aws_secret_key = os.getenv('AWS_SECRET_ACCESS_KEY')
-        self.aws_region = os.getenv('AWS_REGION', 'us-east-1')
+        self.aws_region = os.getenv('AWS_REGION', 'ap-south-1')
         self.bucket_name = os.getenv('AWS_S3_BUCKET', 'classroom-assistant-audio')
         self.bucket_created = False
         
