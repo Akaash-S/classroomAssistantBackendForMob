@@ -11,8 +11,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     FLASK_DEBUG=0 \
     PORT=10000
 
-# AWS credentials will be passed via environment variables
-# No need to copy credential files into the container
+# Environment variables will be passed via Docker or Render
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \

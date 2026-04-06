@@ -25,14 +25,12 @@ services:
         sync: false
       - key: GROQ_API_KEY
         sync: false
-      - key: AWS_ACCESS_KEY_ID
+      - key: SUPABASE_URL
         sync: false
-      - key: AWS_SECRET_ACCESS_KEY
+      - key: SUPABASE_KEY
         sync: false
-      - key: AWS_REGION
-        value: us-east-1
-      - key: AWS_S3_BUCKET
-        sync: false
+      - key: SUPABASE_BUCKET
+        value: classroom-assistant
       - key: CORS_ORIGINS
         value: "*"
     healthCheckPath: /api/health
