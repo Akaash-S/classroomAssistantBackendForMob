@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Script to verify all imports are correct before deployment
-Checks for any remaining Supabase storage imports
+Checks for any remaining S3 storage imports
 """
 
 import os
@@ -9,17 +9,17 @@ import sys
 import re
 from pathlib import Path
 
-def check_file_for_supabase_imports(file_path):
-    """Check a single file for Supabase storage imports"""
+def check_file_for_s3_imports(file_path):
+    """Check a single file for S3 storage imports"""
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
             content = f.read()
             
         # Patterns to check
         patterns = [
-            r'from\s+services\.supabase_storage\s+import',
-            r'import\s+.*supabase_storage',
-            r'SupabaseStorageService\s*\(',
+            r'from\s+services\.s3_storage\s+import',
+            r'import\s+.*s3_storage',
+            r'S3StorageService\s*\(',
         ]
         
         issues = []
@@ -36,14 +36,14 @@ def check_file_for_supabase_imports(file_path):
 def main():
     """Main function"""
     print("=" * 60)
-    print("Verifying Imports - Checking for Supabase Storage References")
+    print("Verifying Imports - Checking for S3 Storage References")
     print("=" * 60)
     print()
     
     # Files to check
     backend_dir = Path(__file__).parent
     
-    # Python files to check (excluding test files and supabase_storage.py itself)
+    # Python files to check (excluding test files and s3_storage.py itself)
     files_to_check = [
         backend_dir / 'app.py',
         backend_dir / 'routes' / 'lectures.py',
@@ -62,9 +62,11 @@ def main():
     
     for file_path in files_to_check:
         if not file_path.exists():
+            if str(file_path).endswith('s3_storage.py'):
+                 continue
             continue
             
-        issues = check_file_for_supabase_imports(file_path)
+        issues = check_file_for_s3_imports(file_path)
         
         if issues:
             all_clear = False
@@ -79,12 +81,12 @@ def main():
     print("=" * 60)
     
     if all_clear:
-        print("✅ All imports verified! No Supabase storage references found.")
-        print("Ready for deployment!")
+        print("✅ All imports verified! No S3 storage references found.")
+        print("Ready for deployment with Supabase!")
         return 0
     else:
-        print("❌ Found Supabase storage references!")
-        print("Please update the files above to use S3StorageService instead.")
+        print("❌ Found S3 storage references!")
+        print("Please update the files above to use SupabaseStorageService instead.")
         return 1
 
 if __name__ == "__main__":

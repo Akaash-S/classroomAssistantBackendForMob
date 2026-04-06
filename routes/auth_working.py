@@ -294,9 +294,9 @@ def update_user_profile(firebase_uid):
 
 @auth_bp.route('/user/<user_id>/upload-avatar', methods=['POST'])
 def upload_avatar(user_id):
-    """Upload user avatar to AWS S3"""
+    """Upload user avatar to Supabase"""
     try:
-        from services.s3_storage import S3StorageService
+        from services.supabase_storage import SupabaseStorageService
         import uuid
         
         user = User.query.get(user_id)
@@ -331,11 +331,12 @@ def upload_avatar(user_id):
                 'message': f'Invalid file type. Allowed: {", ".join(allowed_extensions)}'
             }), 400
         
-        # Upload to S3
-        s3_service = S3StorageService()
+        # Upload to Supabase
+        from services.supabase_storage import SupabaseStorageService
+        storage_service = SupabaseStorageService()
         
         # Generate unique filename
-        filename = f"profile/{user.id}_{uuid.uuid4().hex}.{file_ext}"
+        filename = f"{user.id}_{uuid.uuid4().hex}.{file_ext}"
         
         # Read file content
         file_content = avatar_file.read()
@@ -351,20 +352,26 @@ def upload_avatar(user_id):
         content_type = content_type_map.get(file_ext, 'image/jpeg')
         
         # Upload using upload_image method
-        avatar_url = s3_service.upload_image(filename, file_content, content_type)
+        avatar_url = storage_service.upload_image(filename, file_content, content_type)
         
         if not avatar_url:
             return jsonify({
                 'status': 'error',
-                'message': 'Failed to upload avatar to S3'
+                'message': 'Failed to upload avatar to Supabase'
             }), 500
         
         # Delete old avatar if exists
         if user.avatar_url:
             try:
-                # Extract the key from the old URL
-                old_key = user.avatar_url.split('.com/')[-1]
-                s3_service.delete_file(old_key)
+                # Extract the path from the old URL
+                # Supabase URLs look like: .../storage/v1/object/public/images/profiles/filename.jpg
+                if '/public/images/profiles/' in user.avatar_url:
+                    old_path = "profiles/" + user.avatar_url.split('/profiles/')[-1]
+                else:
+                    # Fallback for old S3 URLs or different formats
+                    old_path = user.avatar_url.split('.com/')[-1] if '.com/' in user.avatar_url else user.avatar_url
+                
+                storage_service.delete_file(old_path, bucket_name='images')
             except Exception as e:
                 logger.warning(f"Failed to delete old avatar: {str(e)}")
         

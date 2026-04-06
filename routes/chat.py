@@ -598,7 +598,7 @@ def get_unread_count():
 def upload_document(room_id):
     """Upload a document to a chat room"""
     try:
-        from services.s3_storage import S3StorageService
+        from services.supabase_storage import SupabaseStorageService
         from werkzeug.utils import secure_filename
         
         # Get sender_id from form data
@@ -657,9 +657,9 @@ def upload_document(room_id):
         
         logger.info(f"Uploading document: {filename} ({file_size} bytes) to room {room_id}")
         
-        # Upload to S3
-        s3_service = S3StorageService()
-        document_url = s3_service.upload_document(
+        # Upload to Supabase
+        storage_service = SupabaseStorageService()
+        document_url = storage_service.upload_document(
             file_name=filename,
             file_content=file_content,
             room_id=room_id,
@@ -672,7 +672,7 @@ def upload_document(room_id):
                 'message': 'Failed to upload document to storage'
             }), 500
         
-        logger.info(f"Document uploaded to S3: {document_url}")
+        logger.info(f"Document uploaded to Supabase: {document_url}")
         
         # Create chat message with document
         message_text = f"Shared a document: {filename}"

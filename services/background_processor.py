@@ -7,7 +7,7 @@ from typing import List, Optional
 from models import Lecture, Task, TaskPriority, db
 from services.speech_to_text import SpeechToTextService
 from services.gemini_service import GeminiService
-from services.s3_storage import S3StorageService
+from services.supabase_storage import SupabaseStorageService
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +15,7 @@ class BackgroundProcessor:
     def __init__(self, app=None):
         self.speech_to_text = SpeechToTextService()
         self.gemini_service = GeminiService()
-        self.storage_service = S3StorageService()
+        self.storage_service = SupabaseStorageService()
         self.is_running = False
         self.thread = None
         self.processing_interval = 300  # 5 minutes

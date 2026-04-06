@@ -5,6 +5,11 @@ Environment variable checker for the backend
 
 import os
 import sys
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 def check_env_vars():
     """Check all required environment variables"""

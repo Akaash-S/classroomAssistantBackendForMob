@@ -1,19 +1,22 @@
 from flask import Blueprint, request, jsonify
 from services.speech_to_text import SpeechToTextService
 from services.gemini_service import GeminiService
-from services.s3_storage import S3StorageService
+from services.groq_service import GroqService
+from services.supabase_storage import SupabaseStorageService
 from models import Lecture, Task, TaskPriority, db, User, UserRole
 from datetime import datetime
 import logging
 import os
 
+# Initialize services
 ai_bp = Blueprint('ai', __name__)
 logger = logging.getLogger(__name__)
 
 # Initialize services
 speech_to_text = SpeechToTextService()
 gemini_service = GeminiService()
-storage_service = S3StorageService()
+groq_service = GroqService()
+storage_service = SupabaseStorageService()
 
 @ai_bp.route('/transcribe', methods=['POST'])
 def transcribe_audio():
@@ -60,9 +63,14 @@ def summarize_text():
                 'message': 'Text is required'
             }), 400
         
-        # Generate summary using Gemini
-        summary = gemini_service.generate_summary(data['text'])
+        # Generate summary using Groq
+        summary = groq_service.generate_summary(data['text'])
         
+        if not summary:
+            # Fallback to Gemini if Groq fails
+            logger.warning("Groq summarization failed, falling back to Gemini")
+            summary = gemini_service.generate_summary(data['text'])
+            
         if not summary:
             return jsonify({
                 'status': 'error',
@@ -94,17 +102,16 @@ def extract_tasks():
                 'message': 'Text is required'
             }), 400
         
-        # Extract tasks using Gemini API
+        # Extract tasks using Groq
         tasks = []
         
-        if gemini_service.is_available():
-            logger.info("Using Gemini API for task extraction")
+        if groq_service.is_available():
+            logger.info("Using Groq API for task extraction")
+            tasks = groq_service.extract_tasks(data['text'])
+        
+        if not tasks and gemini_service.is_available():
+            logger.info("Groq task extraction failed or returned no tasks, falling back to Gemini")
             tasks = gemini_service.extract_tasks(data['text'])
-        else:
-            return jsonify({
-                'status': 'error',
-                'message': 'Gemini service not available for task extraction'
-            }), 503
         
         if tasks is None:
             tasks = []
@@ -152,7 +159,11 @@ def process_lecture(lecture_id):
         
         # Step 2: Generate summary
         logger.info(f"Generating summary for lecture: {lecture.title}")
-        summary = gemini_service.generate_summary(transcript)
+        summary = groq_service.generate_summary(transcript)
+        
+        if not summary:
+            logger.warning("Groq summarization failed, falling back to Gemini")
+            summary = gemini_service.generate_summary(transcript)
         
         if not summary:
             return jsonify({
@@ -162,17 +173,23 @@ def process_lecture(lecture_id):
         
         # Step 3: Extract key points
         logger.info(f"Extracting key points for lecture: {lecture.title}")
-        key_points = gemini_service.extract_key_points(transcript)
+        key_points = groq_service.extract_key_points(transcript)
         
-        # Step 4: Extract tasks using Gemini API
+        if not key_points:
+            logger.warning("Groq key points extraction failed, falling back to Gemini")
+            key_points = gemini_service.extract_key_points(transcript)
+        
+        # Step 4: Extract tasks using Groq API
         logger.info(f"Extracting tasks for lecture: {lecture.title}")
         tasks_data = []
         
-        if gemini_service.is_available():
-            logger.info("Using Gemini API for task extraction")
+        if groq_service.is_available():
+            logger.info("Using Groq API for task extraction")
+            tasks_data = groq_service.extract_tasks(transcript)
+        
+        if not tasks_data and gemini_service.is_available():
+            logger.info("Groq task extraction failed, falling back to Gemini")
             tasks_data = gemini_service.extract_tasks(transcript)
-        else:
-            logger.warning("Gemini service not available for task extraction")
         
         # Update lecture with processed data
         lecture.transcript = transcript
