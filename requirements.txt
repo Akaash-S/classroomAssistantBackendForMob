@@ -11,4 +11,4 @@ python-multipart==0.0.6
 Pillow==10.0.1
 gunicorn==21.2.0
 Werkzeug==2.3.7
-groq==0.4.1
+groq>=0.13.0
